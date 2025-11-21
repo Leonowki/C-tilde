@@ -1,8 +1,8 @@
 #ifndef AST_H
 #define AST_H
 
-/* --- AST definitions --- */
-typedef enum {
+typedef enum
+{
     NODE_PROGRAM,
     NODE_STMT_LIST,
     NODE_DECL,
@@ -18,7 +18,8 @@ typedef enum {
     NODE_IDENT
 } NodeKind;
 
-typedef struct AST {
+typedef struct AST
+{
     NodeKind kind;
     struct AST *left;
     struct AST *right;
@@ -28,4 +29,4 @@ typedef struct AST {
     char *strval;
 } AST;
 
-#endif /* AST_H */
+#endif

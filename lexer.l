@@ -54,6 +54,7 @@ static char unquote_char(const char *s) {
 }
 
 %}
+%option yylineno
 
 %x COMMENT
 
