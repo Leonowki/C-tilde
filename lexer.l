@@ -2,24 +2,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "symbol_table.h"
+#include "ast.h"
 #include "parser.tab.h"    
 
 static char *unquote_string(const char *s) {
     size_t len = strlen(s);
     if (len < 2) return strdup("");
-    char *out = malloc(len-1);
+    char *out = malloc(len - 1);
     size_t oi = 0;
     for (size_t i = 1; i + 1 < len; ++i) {
         if (s[i] == '\\' && i + 1 < len - 1) {
             ++i;
             switch (s[i]) {
-                case 'n': out[oi++] = '\n'; break;
-                case 't': out[oi++] = '\t'; break;
+                case 'n':  out[oi++] = '\n'; break;
+                case 't':  out[oi++] = '\t'; break;
                 case '\\': out[oi++] = '\\'; break;
                 case '\'': out[oi++] = '\''; break;
                 case '\"': out[oi++] = '\"'; break;
-                case '0': out[oi++] = '\0'; break;
-                default: out[oi++] = s[i]; break;
+                case '0':  out[oi++] = '\0'; break;
+                default:   out[oi++] = s[i]; break;
             }
         } else {
             out[oi++] = s[i];
@@ -39,77 +41,78 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 
 %%
 
-"nmbr"    { printf("TOK_NMBR ") ; return TOK_NMBR; } 
-"chr"     { printf("TOK_CHR ") ; return TOK_CHR; } 
-"flex"    { printf("TOK_FLEX ") ; return TOK_FLEX; } 
-"shw"     { printf("TOK_SHW ") ; return TOK_SHW; }  
+    /* Comments - must come before catch-all */
+"//".*                ;
+"@".*                 ;
+"/*"                  { BEGIN(COMMENT); }
+<COMMENT>"*/"         { BEGIN(INITIAL); }
+<COMMENT>\n           { }
+<COMMENT>.            { }
 
-\n                      { printf("TOK_NEWLINE ") ; return TOK_NEWLINE; }
+    /* Keywords */
+"nmbr"    { return TOK_NMBR; } 
+"chr"     { return TOK_CHR; } 
+"flex"    { return TOK_FLEX; } 
+"shw"     { return TOK_SHW; }  
 
+    /* Newline as delimiter */
+\n        { return TOK_NEWLINE; }
+
+    /* Number literals */
 {DIGIT}+  {
-            printf("TOK_NUMBER_LITERAL ") ;
+            yylval.num = atoi(yytext);
             return TOK_NUMBER_LITERAL;
           }
 
-","       { printf("TOK_COMMA ") ; return TOK_COMMA; }
-"("       { printf("TOK_LPAREN ") ;  return TOK_LPAREN; }
-")"       { printf("TOK_RPAREN ") ;  return TOK_RPAREN; }
-"+:"      { printf("TOK_PLUS_ASSIGN ") ;  return TOK_PLUS_ASSIGN; }
-"-:"      { printf("TOK_MINUS_ASSIGN ") ;  return TOK_MINUS_ASSIGN; }
-"*:"      { printf("TOK_MULT_ASSIGN ") ;  return TOK_MULT_ASSIGN; }
-"/:"      { printf("TOK_DIV_ASSIGN ") ;  return TOK_DIV_ASSIGN; }
-":"       { printf("TOK_ASSIGN ") ; return TOK_ASSIGN; }
-"."       { printf("TOK_CONCAT ") ;  return TOK_CONCAT; }
+    /* Compound assignment operators (must come before single char operators) */
+"+:"      { return TOK_PLUS_ASSIGN; }
+"-:"      { return TOK_MINUS_ASSIGN; }
+"*:"      { return TOK_MULT_ASSIGN; }
+"/:"      { return TOK_DIV_ASSIGN; }
 
-"+"       { printf("TOK_PLUS ") ;  return TOK_PLUS; }
-"-"       { printf("TOK_MINUS ") ;  return TOK_MINUS; }
-"*"       { printf("TOK_MULT ") ;  return TOK_MULT; }
-"/"       { printf("TOK_DIV ") ;  return TOK_DIV; }
+    /* Single char operators and delimiters */
+":"       { return TOK_ASSIGN; }
+"."       { return TOK_CONCAT; }
+"+"       { return TOK_PLUS; }
+"-"       { return TOK_MINUS; }
+"*"       { return TOK_MULT; }
+"/"       { return TOK_DIV; }
+","       { return TOK_COMMA; }
+"("       { return TOK_LPAREN; }
+")"       { return TOK_RPAREN; }
 
-          
-'\\n'     { printf("TOK_CHAR_LITERAL ") ;  return TOK_CHAR_LITERAL; }
-'\\t'     { printf("TOK_CHAR_LITERAL ") ;  return TOK_CHAR_LITERAL; }
-'\\\\'    { printf("TOK_CHAR_LITERAL ") ;   return TOK_CHAR_LITERAL; }
-'\\''     { printf("TOK_CHAR_LITERAL ") ;   return TOK_CHAR_LITERAL; }
-'\\0'     { printf("TOK_CHAR_LITERAL ") ;   return TOK_CHAR_LITERAL; }
+    /* Character literals - escape sequences */
+'\\n'     { yylval.ch = '\n'; return TOK_CHAR_LITERAL; }
+'\\t'     { yylval.ch = '\t'; return TOK_CHAR_LITERAL; }
+'\\\\'    { yylval.ch = '\\'; return TOK_CHAR_LITERAL; }
+'\\''     { yylval.ch = '\''; return TOK_CHAR_LITERAL; }
+'\\0'     { yylval.ch = '\0'; return TOK_CHAR_LITERAL; }
 
+    /* Character literals - regular */
 \'[^\\]\'   {
-    printf("TOK_CHAR_LITERAL ") ;
+            yylval.ch = yytext[1];
+            return TOK_CHAR_LITERAL;
+          }
 
-    return TOK_CHAR_LITERAL;
-}
-
+    /* String literals */
 \"([^\"\n\\]|\\.)*\" {
-            printf("TOK_STRING_LITERAL ") ;
-
+            yylval.str = unquote_string(yytext);
             return TOK_STRING_LITERAL;
           }
 
+    /* Identifiers */
 {ID}      {
-            printf("TOK_IDENTIFIER ") ;
-
+            yylval.str = strdup(yytext);
             return TOK_IDENTIFIER;
           }
 
-[ \t\r]+                ;
+    /* Whitespace */
+[ \t\r]+  ;
 
-
-.         { printf("TOK_UNKNOWN ") ;  return TOK_UNKNOWN; }
-
-
-
-"//".* ;
-
-"@".* ;
-
-"/*"              { BEGIN(COMMENT); }
-<COMMENT>"*/"     { BEGIN(INITIAL); }
-<COMMENT>\n       { }
-<COMMENT>.        { }
+    /* Unknown characters */
+.         { return TOK_UNKNOWN; }
 
 %%
-
-
 
 int yywrap(void) {
     return 1;

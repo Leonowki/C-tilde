@@ -46,34 +46,48 @@ extern int yydebug;
    /* Put the tokens into the symbol table, so that GDB and other debuggers
       know about them.  */
    enum yytokentype {
-     TOK_EOF = 0,
-     TOK_TILDE = 258,
-     TOK_COMMA = 259,
-     TOK_LPAREN = 260,
-     TOK_RPAREN = 261,
-     TOK_ASSIGN = 262,
-     TOK_PLUS_ASSIGN = 263,
-     TOK_MINUS_ASSIGN = 264,
-     TOK_MULT_ASSIGN = 265,
-     TOK_DIV_ASSIGN = 266,
-     TOK_PLUS = 267,
-     TOK_MINUS = 268,
-     TOK_MULT = 269,
-     TOK_DIV = 270,
-     TOK_SHW = 271,
-     TOK_NMBR = 272,
-     TOK_CHR = 273,
-     TOK_FLEX = 274,
-     TOK_IDENT = 275,
-     TOK_NUMBER_LITERAL = 276,
-     TOK_CHAR_LITERAL = 277,
-     TOK_STRING_LITERAL = 278
+     TOK_NMBR = 258,
+     TOK_CHR = 259,
+     TOK_FLEX = 260,
+     TOK_SHW = 261,
+     TOK_PLUS = 262,
+     TOK_MINUS = 263,
+     TOK_MULT = 264,
+     TOK_DIV = 265,
+     TOK_PLUS_ASSIGN = 266,
+     TOK_MINUS_ASSIGN = 267,
+     TOK_MULT_ASSIGN = 268,
+     TOK_DIV_ASSIGN = 269,
+     TOK_ASSIGN = 270,
+     TOK_CONCAT = 271,
+     TOK_LPAREN = 272,
+     TOK_RPAREN = 273,
+     TOK_NEWLINE = 274,
+     TOK_COMMA = 275,
+     TOK_UNKNOWN = 276,
+     TOK_NUMBER_LITERAL = 277,
+     TOK_CHAR_LITERAL = 278,
+     TOK_STRING_LITERAL = 279,
+     TOK_IDENTIFIER = 280
    };
 #endif
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
-typedef int YYSTYPE;
+typedef union YYSTYPE
+{
+/* Line 2058 of yacc.c  */
+#line 21 "parser.y"
+
+    int num;
+    char ch;
+    char *str;
+    struct ASTNode *node;
+
+
+/* Line 2058 of yacc.c  */
+#line 90 "parser.tab.h"
+} YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
 # define YYSTYPE_IS_DECLARED 1
