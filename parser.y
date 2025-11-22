@@ -1,184 +1,113 @@
 %{
-// C code to be included at the top of the parser
 #include <stdio.h>
-// Protos for flex
-int yylex(void);
+#include <stdlib.h>
+#include <string.h>
+
+
+extern int yylex();
+extern int yylineno;
+extern char *yytext;
+
+
+typedef struct{ //Listing lines with error
+   int errValue;
+}errorList;
+errorList list[40];
+
+int checkError(int x, int y){
+    if (x == y){
+	return 1;
+    }else{
+	return 0;
+    }
+}
+int lineCount = 1, cntr = 0; // track real line number per input line
+
 void yyerror(const char *s);
+
+
 %}
 
-/* * 1. TOKEN DECLARATIONS
- * These are all the terminal symbols (tokens) that 
- * Flex will need to provide to Yacc.
- */
-%token TOK_EOF 0 /* 0 signals end-of-file */
+%union {
+    int num;
+    char ch;
+    char* str;
+}
 
-/* Punctuation */
-%token TOK_TILDE
-%token TOK_COMMA
-%token TOK_LPAREN
-%token TOK_RPAREN
+// Keywords
+%token TOK_NMBR
+%token TOK_CHR
+%token TOK_FLEX
+%token TOK_SHW
 
-/* Assignment Operators */
-%token TOK_ASSIGN
-%token TOK_PLUS_ASSIGN
-%token TOK_MINUS_ASSIGN
-%token TOK_MULT_ASSIGN
-%token TOK_DIV_ASSIGN
-
-/* Arithmetic Operators */
+// Operators
 %token TOK_PLUS
 %token TOK_MINUS
 %token TOK_MULT
 %token TOK_DIV
 
-/* Keywords */
-%token TOK_SHW
-%token TOK_NMBR
-%token TOK_CHR
-%token TOK_FLEX /* Your flexible type */
+%token TOK_PLUS_ASSIGN
+%token TOK_MINUS_ASSIGN
+%token TOK_MULT_ASSIGN
+%token TOK_DIV_ASSIGN
+%token TOK_ASSIGN
+%token TOK_CONCAT
 
-/* Literals & Identifiers */
-%token TOK_IDENT
-%token TOK_NUMBER_LITERAL
-%token TOK_CHAR_LITERAL
-%token TOK_STRING_LITERAL
+// Delimiters
+%token TOK_LPAREN
+%token TOK_RPAREN
+%token TOK_NEWLINE
 
-/* --------------------------------------------------- */
-/* The grammar definitions start after the first %% */
-%%
+// Others
+%token TOK_COMMA
+%token TOK_UNKNOWN
 
-/* * 2. GRAMMAR RULES
- * The start symbol is the first rule listed (program).
- */
-
-program:
-    stmt_list 
-    ;
-
-/*
- * CHANGED: This is now left-recursive.
- * It builds the list of statements from left to right.
- */
-stmt_list:
-        /* empty */ 
-    | stmt_list stmt
-    ;
-
-stmt:
-    decl_stmt TOK_TILDE
-    | assign_stmt TOK_TILDE
-    | shw_stmt TOK_TILDE
-    | expr_stmt TOK_TILDE
-    | TOK_TILDE
-    ;
-
-decl_stmt:
-    type init_list
-    ;
-
-type:
-    TOK_NMBR
-    | TOK_CHR
-    | TOK_FLEX  
-    ;
+// Literals
+%token <num> TOK_NUMBER_LITERAL
+%token <ch> TOK_CHAR_LITERAL
+%token <str> TOK_STRING_LITERAL
+%token <str> TOK_IDENTIFIER
 
 
-init_list:
-    init
-    | init_list TOK_COMMA init
-    ;
+%left '+' '-'
 
-init:
-    TOK_IDENT
-    | TOK_IDENT TOK_ASSIGN expression
-    ;
-
-assign_stmt:
-    TOK_IDENT assign_op expression
-    ;
-
-assign_op:
-    TOK_ASSIGN
-    | TOK_PLUS_ASSIGN
-    | TOK_MINUS_ASSIGN
-    | TOK_MULT_ASSIGN
-    | TOK_DIV_ASSIGN
-    ;
-
-shw_stmt:
-    TOK_SHW TOK_LPAREN arg_list_opt TOK_RPAREN
-    ;
-
-/* * This rule simplifies the optional list.
- * A shw() call can have nothing, or it can have a list.
- */
-arg_list_opt:
-    /* empty */
-    | arg_list
-    ;
-
-/*
- * CHANGED: This is now left-recursive.
- * Original: expression | expression TOK_COMMA arg_list
- */
-arg_list:
-    expression
-    | arg_list TOK_COMMA expression
-    ;
-
-expr_stmt:
-    expression
-    ;
-
-
-expression:
-    additive_expression
-    ;
-
-additive_expression:
-    multiplicative_expression
-    | additive_expression TOK_PLUS multiplicative_expression
-    | additive_expression TOK_MINUS multiplicative_expression
-    ;
-
-multiplicative_expression:
-    unary_expression
-    | multiplicative_expression TOK_MULT unary_expression
-    | multiplicative_expression TOK_DIV unary_expression
-    ;
-
-unary_expression:
-    primary_expression
-    | TOK_PLUS unary_expression
-    | TOK_MINUS unary_expression
-    ;
-
-primary_expression:
-    TOK_NUMBER_LITERAL
-    | TOK_CHAR_LITERAL
-    | TOK_STRING_LITERAL
-    | TOK_IDENT
-    | TOK_LPAREN expression TOK_RPAREN
-    ;
+%type <num> exp
 
 %%
 
-/* * 4. C CODE SECTION
- * This code is copied to the end of the generated C file.
- */
-
-// Your C error-reporting function
-void yyerror(const char *s) {
-    fprintf(stderr, "Parse error: %s\n", s);
-}
+program:	line_list
+      		;
 
 
-int main() {
-    // yyparse() returns 0 on success
-    if (yyparse() == 0) {
-        printf("Parse successful!\n");
-    } else {
-        printf("Parse failed.\n");
-    }
-    return 0;
+line_list:	line_list line
+    		| line
+    		;
+
+line:		exp { 
+		  int x, result;
+		  for(x = 1; x <= cntr; x++){
+		     result = checkError(list[x].errValue,lineCount);
+		     if(result>0){ break; }
+		  }
+		  if(result <= 0){
+		     printf("\nLINE %d: (Result: %d)\n", lineCount, $1);} 
+		  }
+    		| Statement_1
+    		| error '\n' { yyerror("Invalid Character"); yyerrok; }
+    		| TOK_NEWLINE {++lineCount;}
+    		;
+
+
+exp:	        TOK_NUMBER_LITERAL { $$ = $1; }
+    		| exp '+' exp { $$ = $1 + $3; }
+		| exp '-' exp { $$ = $1 - $3; }
+    		;
+
+
+Statement_1:    TOK_SHW TOK_STRING_LITERAL { printf("\nLINE %d: %s\n", lineCount, $2); }
+
+%%
+
+void yyerror(const char *s){
+    fprintf(stderr, "Error at line %d: %s\n", lineCount, s);
 }
