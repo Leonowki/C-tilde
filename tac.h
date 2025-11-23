@@ -81,4 +81,7 @@ const char *tac_op_to_string(TACOp op);
 //execute tac
 void tac_execute(TACProgram *prog);
 
+//assembly code generation
+void tac_generate_assembly(TACProgram *prog, const char *filename);
+
 #endif

@@ -3,6 +3,20 @@
 #include <string.h>
 #include "tac.h"
 
+static int next_register = 0;
+
+/* Track register allocation for temporaries and variables */
+typedef struct {
+    char name[64];
+    const char *reg;
+    int memOffset;
+    int isVariable;  /* Only variables get memory, not temps */
+} RegAlloc;
+
+static RegAlloc regMap[100];
+static int regMapCount = 0;
+static int nextMemOffset = 0;
+
 TACProgram *tac_create_program(void) {
     TACProgram *prog = malloc(sizeof(TACProgram));
     prog->head = NULL;
@@ -262,7 +276,12 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
-                set_number(s, value);
+                // Use appropriate setter based on variable type
+                if (s->type == TYPE_CHR) {
+                    set_char(s, (char)value);
+                } else {
+                    set_number(s, value);
+                }
             }
             break;
         }
@@ -287,6 +306,7 @@ void tac_execute(TACProgram *prog) {
             case TAC_LOAD_INT: {
                 int value = get_operand_value(instr->arg1, tempValues);
                 set_operand_value(instr->result, value, tempValues);
+                
                 break;
             }
             
@@ -335,6 +355,246 @@ void tac_execute(TACProgram *prog) {
     }
     
     free(tempValues);
+}
+
+static const char* get_next_register(void) {
+    static const char* registers[] = {
+        "$t0", "$t1", "$t2", "$t3", "$t4", 
+        "$t5", "$t6", "$t7", "$t8", "$t9"
+    };
+    const char* reg = registers[next_register % 10];
+    next_register++;
+    return reg;
+}
+
+static const char* get_or_alloc_register(TACOperand op, RegAlloc **allocOut) {
+    char key[64];
+    int isVar = 0;
+    
+    switch (op.type) {
+        case OPERAND_TEMP:
+            sprintf(key, "t%d", op.val.tempNum);
+            isVar = 0;
+            break;
+        case OPERAND_VAR:
+            sprintf(key, "%s", op.val.varName);
+            isVar = 1;
+            break;
+        default:
+            return NULL;
+    }
+    
+    /* Check if already allocated */
+    for (int i = 0; i < regMapCount; i++) {
+        if (strcmp(regMap[i].name, key) == 0) {
+            if (allocOut) *allocOut = &regMap[i];
+            return regMap[i].reg;
+        }
+    }
+    
+    /* Allocate new register */
+    RegAlloc *alloc = &regMap[regMapCount++];
+    strcpy(alloc->name, key);
+    alloc->reg = get_next_register();
+    alloc->isVariable = isVar;
+    
+    /* Only variables get memory offsets, not temporaries */
+    if (isVar) {
+        alloc->memOffset = nextMemOffset;
+        nextMemOffset += 8; /* 8 bytes per word in MIPS64 */
+    } else {
+        alloc->memOffset = -1; /* Temps don't have memory */
+    }
+    
+    if (allocOut) *allocOut = alloc;
+    return alloc->reg;
+}
+
+/* Get memory offset for variable/temp */
+static int get_memory_offset(TACOperand op) {
+    if (op.type == OPERAND_VAR) {
+        Symbol *s = lookup(op.val.varName);
+        if (s) {
+            return s->memOffset;
+        }
+    }
+    return -1;  /* Temps don't have memory */
+}
+
+/* Generate EduMIPS64 assembly code */
+void tac_generate_assembly(TACProgram *prog, const char *output_file) {
+    FILE *fp = fopen(output_file, "w");
+    if (!fp) {
+        fprintf(stderr, "Error: Cannot open output file %s\n", output_file);
+        return;
+    }
+    
+    /* Reset allocator state */
+    next_register = 0;
+    
+    /* Write assembly header */
+    fprintf(fp, ".data\n\n");
+    fprintf(fp, ".code\n\n");
+    
+    /* Generate code for each TAC instruction */
+    for (TACInstr *instr = prog->head; instr; instr = instr->next) {
+        
+        switch (instr->op) {
+            case TAC_LOAD_INT: {
+                /* Load immediate value into a register */
+                const char *destReg = get_or_alloc_register(instr->result, NULL);
+                int value = instr->arg1.val.intVal;
+                
+                fprintf(fp, "daddiu %s, $zero, %d\n", destReg, value);
+                break;
+            }
+            
+            case TAC_ADD: {
+                /* Need to load operands from memory if they're variables */
+                const char *leftReg = get_next_register();
+                const char *rightReg = get_next_register();
+                const char *destReg = get_or_alloc_register(instr->result, NULL);
+                
+                /* Load left operand */
+                if (instr->arg1.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg1);
+                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                } else {
+                    /* It's a temp, use its register */
+                    leftReg = get_or_alloc_register(instr->arg1, NULL);
+                }
+                
+                /* Load right operand */
+                if (instr->arg2.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg2);
+                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                } else {
+                    /* It's a temp, use its register */
+                    rightReg = get_or_alloc_register(instr->arg2, NULL);
+                }
+                
+                fprintf(fp, "daddu %s, %s, %s\n", destReg, leftReg, rightReg);
+                break;
+            }
+            
+            case TAC_SUB: {
+                const char *leftReg = get_next_register();
+                const char *rightReg = get_next_register();
+                const char *destReg = get_or_alloc_register(instr->result, NULL);
+                
+                /* Load left operand */
+                if (instr->arg1.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg1);
+                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                } else {
+                    leftReg = get_or_alloc_register(instr->arg1, NULL);
+                }
+                
+                /* Load right operand */
+                if (instr->arg2.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg2);
+                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                } else {
+                    rightReg = get_or_alloc_register(instr->arg2, NULL);
+                }
+                
+                fprintf(fp, "dsubu %s, %s, %s\n", destReg, leftReg, rightReg);
+                break;
+            }
+            
+            case TAC_MUL: {
+                const char *leftReg = get_next_register();
+                const char *rightReg = get_next_register();
+                const char *destReg = get_or_alloc_register(instr->result, NULL);
+                
+                /* Load left operand */
+                if (instr->arg1.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg1);
+                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                } else {
+                    leftReg = get_or_alloc_register(instr->arg1, NULL);
+                }
+                
+                /* Load right operand */
+                if (instr->arg2.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg2);
+                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                } else {
+                    rightReg = get_or_alloc_register(instr->arg2, NULL);
+                }
+                
+                fprintf(fp, "dmult %s, %s\n", leftReg, rightReg);
+                fprintf(fp, "mflo %s\n", destReg);
+                break;
+            }
+            
+            case TAC_DIV: {
+                const char *leftReg = get_next_register();
+                const char *rightReg = get_next_register();
+                const char *destReg = get_or_alloc_register(instr->result, NULL);
+                
+                /* Load left operand */
+                if (instr->arg1.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg1);
+                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                } else {
+                    leftReg = get_or_alloc_register(instr->arg1, NULL);
+                }
+                
+                /* Load right operand */
+                if (instr->arg2.type == OPERAND_VAR) {
+                    int offset = get_memory_offset(instr->arg2);
+                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                } else {
+                    rightReg = get_or_alloc_register(instr->arg2, NULL);
+                }
+                
+                fprintf(fp, "ddiv %s, %s\n", leftReg, rightReg);
+                fprintf(fp, "mflo %s\n", destReg);
+                break;
+            }
+            
+            case TAC_COPY: {
+                if (instr->arg1.type == OPERAND_INT) {
+                    /* Load immediate and store to variable */
+                    const char *tempReg = get_next_register();
+                    int value = instr->arg1.val.intVal;
+                    int destOffset = get_memory_offset(instr->result);
+                    
+                    if (destOffset >= 0) {  /* Only store if it's a variable */
+                        fprintf(fp, "daddiu %s, $zero, %d\n", tempReg, value);
+                        fprintf(fp, "sd %s, %d($zero)\n", tempReg, destOffset);
+                    }
+                } else if (instr->arg1.type == OPERAND_VAR) {
+                    /* Load from one variable and store to another */
+                    const char *tempReg = get_next_register();
+                    int srcOffset = get_memory_offset(instr->arg1);
+                    int destOffset = get_memory_offset(instr->result);
+                    
+                    if (srcOffset >= 0 && destOffset >= 0) {
+                        fprintf(fp, "ld %s, %d($zero)\n", tempReg, srcOffset);
+                        fprintf(fp, "sd %s, %d($zero)\n", tempReg, destOffset);
+                    }
+                } else {
+                    /* Copy from temp to variable (store to memory) */
+                    const char *srcReg = get_or_alloc_register(instr->arg1, NULL);
+                    int destOffset = get_memory_offset(instr->result);
+                    
+                    if (destOffset >= 0) {  /* Only store if it's a variable */
+                        fprintf(fp, "sd %s, %d($zero)\n", srcReg, destOffset);
+                    }
+                }
+                break;
+            }
+            
+            default:
+                break;
+        }
+    }
+    
+    fprintf(fp, "\n");
+    fclose(fp);
+    printf("Assembly code written to %s\n", output_file);
 }
 
 //free function

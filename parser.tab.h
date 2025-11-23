@@ -64,11 +64,10 @@ extern int yydebug;
      TOK_RPAREN = 273,
      TOK_NEWLINE = 274,
      TOK_COMMA = 275,
-     TOK_UNKNOWN = 276,
-     TOK_NUMBER_LITERAL = 277,
-     TOK_CHAR_LITERAL = 278,
-     TOK_STRING_LITERAL = 279,
-     TOK_IDENTIFIER = 280
+     TOK_NUMBER_LITERAL = 276,
+     TOK_CHAR_LITERAL = 277,
+     TOK_STRING_LITERAL = 278,
+     TOK_IDENTIFIER = 279
    };
 #endif
 
@@ -86,7 +85,7 @@ typedef union YYSTYPE
 
 
 /* Line 2058 of yacc.c  */
-#line 90 "parser.tab.h"
+#line 89 "parser.tab.h"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */

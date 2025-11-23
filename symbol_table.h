@@ -23,10 +23,11 @@ typedef struct {
     char *name;
     VarType type;     
     FlexType flexType;
-
     int numVal;
     char chrVal;
     char *strVal;
+    int memOffset;    
+    int size;         
 } Symbol;
 
 extern Symbol symtab[MAX_SYMBOLS];
@@ -40,5 +41,9 @@ const char *type_to_string(VarType type);
 void set_number(Symbol *s, int value);
 void set_char(Symbol *s, char value);
 FlexType get_runtime_type(Symbol *s);
+
+// NEW: Function to compute memory layout after all symbols are declared
+void compute_symbol_offsets(void);
+int get_size_for_type(VarType type);
 
 #endif

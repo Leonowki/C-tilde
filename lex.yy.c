@@ -774,7 +774,7 @@ YY_RULE_SETUP
 {
             yylval.num = atoi(yytext);
             return TOK_NUMBER_LITERAL;
-          }
+        }
 	YY_BREAK
 /* Compound assignment operators (must come before single char operators) */
 case 13:
@@ -906,7 +906,7 @@ YY_RULE_SETUP
 case 35:
 YY_RULE_SETUP
 #line 113 "lexer.l"
-{ return TOK_UNKNOWN; }
+
 	YY_BREAK
 case 36:
 YY_RULE_SETUP

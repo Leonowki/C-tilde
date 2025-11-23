@@ -62,7 +62,7 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 {DIGIT}+  {
             yylval.num = atoi(yytext);
             return TOK_NUMBER_LITERAL;
-          }
+        }
 
     /* Compound assignment operators (must come before single char operators) */
 "+:"      { return TOK_PLUS_ASSIGN; }
@@ -110,7 +110,7 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 [ \t\r]+  ;
 
     /* Unknown characters */
-.         { return TOK_UNKNOWN; }
+.         
 
 %%
 
