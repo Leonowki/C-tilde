@@ -492,13 +492,13 @@ static const yytype_int8 yyrhs[] =
 };
 
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
-static const yytype_uint8 yyrline[] =
+static const yytype_uint16 yyrline[] =
 {
        0,    73,    73,    77,    84,    88,    96,    97,    98,   102,
-     103,   104,   105,   110,   114,   118,   123,   127,   132,   136,
-     142,   147,   152,   160,   171,   179,   187,   195,   206,   212,
-     213,   219,   220,   221,   225,   226,   227,   231,   232,   233,
-     237,   238,   239,   240,   245
+     103,   104,   105,   110,   114,   118,   123,   131,   140,   148,
+     158,   167,   176,   188,   199,   207,   215,   223,   234,   240,
+     241,   247,   248,   249,   253,   254,   255,   259,   260,   261,
+     265,   266,   267,   268,   273
 };
 #endif
 
@@ -1540,73 +1540,101 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 123 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_NMBR);
-            (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
+            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_NMBR, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;  // Error already reported
+            } else {
+                (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
+            }
         }
     break;
 
   case 17:
 /* Line 1792 of yacc.c  */
-#line 127 "parser.y"
+#line 131 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_CHR);
-            ASTNode *init = ast_create_chr_lit((yyvsp[(4) - (4)].ch), lineCount);
-            (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (4)].str), init, lineCount);
+            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_CHR, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;
+            } else {
+                ASTNode *init = ast_create_chr_lit((yyvsp[(4) - (4)].ch), lineCount);
+                (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (4)].str), init, lineCount);
+            }
         }
     break;
 
   case 18:
 /* Line 1792 of yacc.c  */
-#line 132 "parser.y"
+#line 140 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_FLEX);
-            (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
+            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_FLEX, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;
+            } else {
+                (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
+            }
         }
     break;
 
   case 19:
 /* Line 1792 of yacc.c  */
-#line 136 "parser.y"
+#line 148 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_FLEX);
-            ASTNode *init = ast_create_chr_lit((yyvsp[(4) - (4)].ch), lineCount);
-            (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (4)].str), init, lineCount);
+            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_FLEX, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;
+            } else {
+                ASTNode *init = ast_create_chr_lit((yyvsp[(4) - (4)].ch), lineCount);
+                (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (4)].str), init, lineCount);
+            }
         }
     break;
 
   case 20:
 /* Line 1792 of yacc.c  */
-#line 142 "parser.y"
+#line 158 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_NMBR);
-            ASTNode *init = ast_create_num_lit(0, lineCount);
-            (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (2)].str), init, lineCount);
+            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_NMBR, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;
+            } else {
+                ASTNode *init = ast_create_num_lit(0, lineCount);
+                (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (2)].str), init, lineCount);
+            }
         }
     break;
 
   case 21:
 /* Line 1792 of yacc.c  */
-#line 147 "parser.y"
+#line 167 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_CHR);
-            ASTNode *init = ast_create_chr_lit('\0', lineCount);
-            (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (2)].str), init, lineCount);
+            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_CHR, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;
+            } else {
+                ASTNode *init = ast_create_chr_lit('\0', lineCount);
+                (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (2)].str), init, lineCount);
+            }
         }
     break;
 
   case 22:
 /* Line 1792 of yacc.c  */
-#line 152 "parser.y"
+#line 176 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_FLEX);
-            ASTNode *init = ast_create_str_lit("", lineCount);
-            (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (2)].str), init, lineCount);
+            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_FLEX, lineCount, &error_count);
+            if (!s) {
+                (yyval.node) = NULL;
+            } else {
+                ASTNode *init = ast_create_str_lit("", lineCount);
+                (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (2)].str), init, lineCount);
+            }
         }
     break;
 
   case 23:
 /* Line 1792 of yacc.c  */
-#line 160 "parser.y"
+#line 188 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1619,7 +1647,7 @@ yyreduce:
 
   case 24:
 /* Line 1792 of yacc.c  */
-#line 171 "parser.y"
+#line 199 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1632,7 +1660,7 @@ yyreduce:
 
   case 25:
 /* Line 1792 of yacc.c  */
-#line 179 "parser.y"
+#line 207 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1645,7 +1673,7 @@ yyreduce:
 
   case 26:
 /* Line 1792 of yacc.c  */
-#line 187 "parser.y"
+#line 215 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1658,7 +1686,7 @@ yyreduce:
 
   case 27:
 /* Line 1792 of yacc.c  */
-#line 195 "parser.y"
+#line 223 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1671,7 +1699,7 @@ yyreduce:
 
   case 28:
 /* Line 1792 of yacc.c  */
-#line 206 "parser.y"
+#line 234 "parser.y"
     {
             (yyval.node) = ast_create_shw((yyvsp[(2) - (2)].node), lineCount);
         }
@@ -1679,13 +1707,13 @@ yyreduce:
 
   case 29:
 /* Line 1792 of yacc.c  */
-#line 212 "parser.y"
+#line 240 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 30:
 /* Line 1792 of yacc.c  */
-#line 213 "parser.y"
+#line 241 "parser.y"
     {
             (yyval.node) = ast_create_concat((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1693,67 +1721,67 @@ yyreduce:
 
   case 31:
 /* Line 1792 of yacc.c  */
-#line 219 "parser.y"
+#line 247 "parser.y"
     { (yyval.node) = ast_create_str_lit((yyvsp[(1) - (1)].str), lineCount); }
     break;
 
   case 32:
 /* Line 1792 of yacc.c  */
-#line 220 "parser.y"
+#line 248 "parser.y"
     { (yyval.node) = ast_create_ident((yyvsp[(1) - (1)].str), lineCount); }
     break;
 
   case 33:
 /* Line 1792 of yacc.c  */
-#line 221 "parser.y"
+#line 249 "parser.y"
     { (yyval.node) = ast_create_num_lit((yyvsp[(1) - (1)].num), lineCount); }
     break;
 
   case 34:
 /* Line 1792 of yacc.c  */
-#line 225 "parser.y"
+#line 253 "parser.y"
     { (yyval.node) = ast_create_binop(OP_ADD, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 35:
 /* Line 1792 of yacc.c  */
-#line 226 "parser.y"
+#line 254 "parser.y"
     { (yyval.node) = ast_create_binop(OP_SUB, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 37:
 /* Line 1792 of yacc.c  */
-#line 231 "parser.y"
+#line 259 "parser.y"
     { (yyval.node) = ast_create_binop(OP_MUL, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 38:
 /* Line 1792 of yacc.c  */
-#line 232 "parser.y"
+#line 260 "parser.y"
     { (yyval.node) = ast_create_binop(OP_DIV, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 40:
 /* Line 1792 of yacc.c  */
-#line 237 "parser.y"
+#line 265 "parser.y"
     { (yyval.node) = ast_create_num_lit((yyvsp[(1) - (1)].num), lineCount); }
     break;
 
   case 41:
 /* Line 1792 of yacc.c  */
-#line 238 "parser.y"
+#line 266 "parser.y"
     { (yyval.node) = ast_create_ident((yyvsp[(1) - (1)].str), lineCount); }
     break;
 
   case 42:
 /* Line 1792 of yacc.c  */
-#line 239 "parser.y"
+#line 267 "parser.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
   case 43:
 /* Line 1792 of yacc.c  */
-#line 240 "parser.y"
+#line 268 "parser.y"
     {
             /* Unary minus: 0 - factor */
             ASTNode *zero = ast_create_num_lit(0, lineCount);
@@ -1763,7 +1791,7 @@ yyreduce:
 
   case 44:
 /* Line 1792 of yacc.c  */
-#line 245 "parser.y"
+#line 273 "parser.y"
     {
             /* Unary plus: just return factor */
             (yyval.node) = (yyvsp[(2) - (2)].node);
@@ -1772,7 +1800,7 @@ yyreduce:
 
 
 /* Line 1792 of yacc.c  */
-#line 1776 "parser.tab.c"
+#line 1804 "parser.tab.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -2004,7 +2032,7 @@ yyreturn:
 
 
 /* Line 2055 of yacc.c  */
-#line 251 "parser.y"
+#line 279 "parser.y"
 
 
 

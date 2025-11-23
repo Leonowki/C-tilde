@@ -24,7 +24,7 @@ ASTNode *ast_create_program(void) {
 }
 
 ASTNode *ast_add_stmt(ASTNode *program, ASTNode *stmt) {
-    if (!stmt) return program;
+    if (!stmt) return program;  // This already exists, good!
     if (program->data.stmtList.count >= program->data.stmtList.capacity) {
         int newCap = program->data.stmtList.capacity == 0 ? 8 : program->data.stmtList.capacity * 2;
         program->data.stmtList.stmts = realloc(program->data.stmtList.stmts, newCap * sizeof(ASTNode *));

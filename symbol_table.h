@@ -34,7 +34,7 @@ extern Symbol symtab[MAX_SYMBOLS];
 extern int symcount;
 
 Symbol *lookup(const char *name);
-Symbol *insert(const char *name, VarType type);
+Symbol *insert(const char *name, VarType type, int line, int *error);
 const char *type_to_string(VarType type);
 
 // New functions

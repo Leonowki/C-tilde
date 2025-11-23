@@ -1,7 +1,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include "tac.h"
+
+
+/* MIPS64 Opcodes and Function Codes */
+#define OPCODE_DADDIU   0x19
+#define OPCODE_LD       0x37
+#define OPCODE_SD       0x3F
+
+/* Function codes for R-format instructions */
+#define FUNCT_DADDU     0x2D
+#define FUNCT_DSUBU     0x2F
+#define FUNCT_DMULT     0x1C
+#define FUNCT_DDIV      0x1E
+#define FUNCT_MFLO      0x12
+
+
+/* MIPS64 Instruction Formats */
+typedef enum {
+    FORMAT_R,  // Register format
+    FORMAT_I,  // Immediate format
+} InstrFormat;
+
 
 static int next_register = 0;
 
@@ -421,7 +443,61 @@ static int get_memory_offset(TACOperand op) {
     return -1;  /* Temps don't have memory */
 }
 
+/* Register mappings */
+static int get_register_number(const char *reg) {
+    if (strcmp(reg, "$zero") == 0) return 0;
+    if (strcmp(reg, "$at") == 0) return 1;
+    
+    // $t0-$t9 (temporaries)
+    if (reg[0] == '$' && reg[1] == 't') {
+        int num = atoi(reg + 2);
+        if (num >= 0 && num <= 7) return 8 + num;   // $t0-$t7
+        if (num >= 8 && num <= 9) return 24 + (num - 8); // $t8-$t9
+    }
+    
+    // $s0-$s7 (saved)
+    if (reg[0] == '$' && reg[1] == 's') {
+        int num = atoi(reg + 2);
+        if (num >= 0 && num <= 7) return 16 + num;
+    }
+    
+    return 0; // default to $zero
+}
+
+/* Encode R-format instruction: op rs rt rd shamt funct */
+static uint32_t encode_r_format(int funct, int rs, int rt, int rd, int shamt) {
+    uint32_t instr = 0;
+    instr |= (rs & 0x1F) << 21;
+    instr |= (rt & 0x1F) << 16;
+    instr |= (rd & 0x1F) << 11;
+    instr |= (shamt & 0x1F) << 6;
+    instr |= (funct & 0x3F);
+    return instr;
+}
+
+static uint32_t encode_i_format(int opcode, int rs, int rt, int16_t immediate) {
+    uint32_t instr = 0;
+    instr |= (opcode & 0x3F) << 26;
+    instr |= (rs & 0x1F) << 21;
+    instr |= (rt & 0x1F) << 16;
+    instr |= (immediate & 0xFFFF);
+    return instr;
+}
+
+/* Print 32-bit binary representation */
+static void print_binary(FILE *fp, uint32_t value) {
+    for (int i = 31; i >= 0; i--) {
+        fprintf(fp, "%d", (value >> i) & 1);
+    }
+}
+
+/* Print hexadecimal representation */
+static void print_hex(FILE *fp, uint32_t value) {
+    fprintf(fp, "0x%08X", value);
+}
+
 /* Generate EduMIPS64 assembly code */
+/* Generate EduMIPS64 assembly and binary code */
 void tac_generate_assembly(TACProgram *prog, const char *output_file) {
     FILE *fp = fopen(output_file, "w");
     if (!fp) {
@@ -429,51 +505,101 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
         return;
     }
     
+    // Create hex output file
+    char hex_file[256];
+    snprintf(hex_file, sizeof(hex_file), "%s.hex", output_file);
+    FILE *hex_fp = fopen(hex_file, "w");
+    
+    // Create binary output file
+    char binary_file[256];
+    snprintf(binary_file, sizeof(binary_file), "%s.bin", output_file);
+    FILE *bin_fp = fopen(binary_file, "w");
+    
     /* Reset allocator state */
     next_register = 0;
     
     /* Write assembly header */
     fprintf(fp, ".data\n\n");
     fprintf(fp, ".code\n\n");
+
+    
     
     /* Generate code for each TAC instruction */
     for (TACInstr *instr = prog->head; instr; instr = instr->next) {
+        char asm_line[256] = "";
+        uint32_t machine_code = 0;
+        int has_machine_code = 1;
         
         switch (instr->op) {
             case TAC_LOAD_INT: {
-                /* Load immediate value into a register */
                 const char *destReg = get_or_alloc_register(instr->result, NULL);
                 int value = instr->arg1.val.intVal;
                 
-                fprintf(fp, "daddiu %s, $zero, %d\n", destReg, value);
+                snprintf(asm_line, sizeof(asm_line), "daddiu %s, $zero, %d", destReg, value);
+                fprintf(fp, "%s\n", asm_line);
+                
+                // Encode: daddiu rt, rs, immediate
+                int rt = get_register_number(destReg);
+                int rs = 0; // $zero
+                machine_code = encode_i_format(OPCODE_DADDIU, rs, rt, (int16_t)value);
                 break;
             }
             
             case TAC_ADD: {
-                /* Need to load operands from memory if they're variables */
                 const char *leftReg = get_next_register();
                 const char *rightReg = get_next_register();
                 const char *destReg = get_or_alloc_register(instr->result, NULL);
                 
-                /* Load left operand */
+                // Load left operand
                 if (instr->arg1.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg1);
-                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", leftReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(leftReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
-                    /* It's a temp, use its register */
                     leftReg = get_or_alloc_register(instr->arg1, NULL);
+                    has_machine_code = 0;
                 }
                 
-                /* Load right operand */
+                // Load right operand
                 if (instr->arg2.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg2);
-                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", rightReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(rightReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
-                    /* It's a temp, use its register */
                     rightReg = get_or_alloc_register(instr->arg2, NULL);
                 }
                 
-                fprintf(fp, "daddu %s, %s, %s\n", destReg, leftReg, rightReg);
+                // Perform addition
+                snprintf(asm_line, sizeof(asm_line), "daddu %s, %s, %s", destReg, leftReg, rightReg);
+                fprintf(fp, "%s\n", asm_line);
+                
+                // Encode: daddu rd, rs, rt
+                int rd = get_register_number(destReg);
+                int rs = get_register_number(leftReg);
+                int rt = get_register_number(rightReg);
+                machine_code = encode_r_format(FUNCT_DADDU, rs, rt, rd, 0);
                 break;
             }
             
@@ -482,23 +608,51 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
                 const char *rightReg = get_next_register();
                 const char *destReg = get_or_alloc_register(instr->result, NULL);
                 
-                /* Load left operand */
                 if (instr->arg1.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg1);
-                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", leftReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(leftReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
                     leftReg = get_or_alloc_register(instr->arg1, NULL);
                 }
                 
-                /* Load right operand */
                 if (instr->arg2.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg2);
-                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", rightReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(rightReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
                     rightReg = get_or_alloc_register(instr->arg2, NULL);
                 }
                 
-                fprintf(fp, "dsubu %s, %s, %s\n", destReg, leftReg, rightReg);
+                snprintf(asm_line, sizeof(asm_line), "dsubu %s, %s, %s", destReg, leftReg, rightReg);
+                fprintf(fp, "%s\n", asm_line);
+                
+                int rd = get_register_number(destReg);
+                int rs = get_register_number(leftReg);
+                int rt = get_register_number(rightReg);
+                machine_code = encode_r_format(FUNCT_DSUBU, rs, rt, rd, 0);
                 break;
             }
             
@@ -507,24 +661,64 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
                 const char *rightReg = get_next_register();
                 const char *destReg = get_or_alloc_register(instr->result, NULL);
                 
-                /* Load left operand */
                 if (instr->arg1.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg1);
-                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", leftReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(leftReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
                     leftReg = get_or_alloc_register(instr->arg1, NULL);
                 }
                 
-                /* Load right operand */
                 if (instr->arg2.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg2);
-                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", rightReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(rightReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
                     rightReg = get_or_alloc_register(instr->arg2, NULL);
                 }
                 
-                fprintf(fp, "dmult %s, %s\n", leftReg, rightReg);
-                fprintf(fp, "mflo %s\n", destReg);
+                snprintf(asm_line, sizeof(asm_line), "dmult %s, %s", leftReg, rightReg);
+                fprintf(fp, "%s\n", asm_line);
+                
+                int rs = get_register_number(leftReg);
+                int rt = get_register_number(rightReg);
+                machine_code = encode_r_format(FUNCT_DMULT, rs, rt, 0, 0);
+                if (hex_fp) {
+                    print_hex(hex_fp, machine_code);
+                    fprintf(hex_fp, "\n");
+                }
+                if (bin_fp) {
+                    print_binary(bin_fp, machine_code);
+                    fprintf(bin_fp, "\n");
+                }
+                
+                snprintf(asm_line, sizeof(asm_line), "mflo %s", destReg);
+                fprintf(fp, "%s\n", asm_line);
+                
+                int rd = get_register_number(destReg);
+                machine_code = encode_r_format(FUNCT_MFLO, 0, 0, rd, 0);
                 break;
             }
             
@@ -533,70 +727,172 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
                 const char *rightReg = get_next_register();
                 const char *destReg = get_or_alloc_register(instr->result, NULL);
                 
-                /* Load left operand */
                 if (instr->arg1.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg1);
-                    fprintf(fp, "ld %s, %d($zero)\n", leftReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", leftReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(leftReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
                     leftReg = get_or_alloc_register(instr->arg1, NULL);
                 }
                 
-                /* Load right operand */
                 if (instr->arg2.type == OPERAND_VAR) {
                     int offset = get_memory_offset(instr->arg2);
-                    fprintf(fp, "ld %s, %d($zero)\n", rightReg, offset);
+                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", rightReg, offset);
+                    fprintf(fp, "%s\n", asm_line);
+                    
+                    int rt = get_register_number(rightReg);
+                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+                    if (hex_fp) {
+                        print_hex(hex_fp, machine_code);
+                        fprintf(hex_fp, "\n");
+                    }
+                    if (bin_fp) {
+                        print_binary(bin_fp, machine_code);
+                        fprintf(bin_fp, "\n");
+                    }
                 } else {
                     rightReg = get_or_alloc_register(instr->arg2, NULL);
                 }
                 
-                fprintf(fp, "ddiv %s, %s\n", leftReg, rightReg);
-                fprintf(fp, "mflo %s\n", destReg);
+                snprintf(asm_line, sizeof(asm_line), "ddiv %s, %s", leftReg, rightReg);
+                fprintf(fp, "%s\n", asm_line);
+                
+                int rs = get_register_number(leftReg);
+                int rt = get_register_number(rightReg);
+                machine_code = encode_r_format(FUNCT_DDIV, rs, rt, 0, 0);
+                if (hex_fp) {
+                    print_hex(hex_fp, machine_code);
+                    fprintf(hex_fp, "\n");
+                }
+                if (bin_fp) {
+                    print_binary(bin_fp, machine_code);
+                    fprintf(bin_fp, "\n");
+                }
+                
+                snprintf(asm_line, sizeof(asm_line), "mflo %s", destReg);
+                fprintf(fp, "%s\n", asm_line);
+                
+                int rd = get_register_number(destReg);
+                machine_code = encode_r_format(FUNCT_MFLO, 0, 0, rd, 0);
                 break;
             }
             
             case TAC_COPY: {
                 if (instr->arg1.type == OPERAND_INT) {
-                    /* Load immediate and store to variable */
                     const char *tempReg = get_next_register();
                     int value = instr->arg1.val.intVal;
                     int destOffset = get_memory_offset(instr->result);
                     
-                    if (destOffset >= 0) {  /* Only store if it's a variable */
-                        fprintf(fp, "daddiu %s, $zero, %d\n", tempReg, value);
-                        fprintf(fp, "sd %s, %d($zero)\n", tempReg, destOffset);
+                    if (destOffset >= 0) {
+                        snprintf(asm_line, sizeof(asm_line), "daddiu %s, $zero, %d", tempReg, value);
+                        fprintf(fp, "%s\n", asm_line);
+                        
+                        int rt = get_register_number(tempReg);
+                        machine_code = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)value);
+                        if (hex_fp) {
+                            print_hex(hex_fp, machine_code);
+                            fprintf(hex_fp, "\n");
+                        }
+                        if (bin_fp) {
+                            print_binary(bin_fp, machine_code);
+                            fprintf(bin_fp, "\n");
+                        }
+                        
+                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d($zero)", tempReg, destOffset);
+                        fprintf(fp, "%s\n", asm_line);
+                        
+                        machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
+                    } else {
+                        has_machine_code = 0;
                     }
                 } else if (instr->arg1.type == OPERAND_VAR) {
-                    /* Load from one variable and store to another */
                     const char *tempReg = get_next_register();
                     int srcOffset = get_memory_offset(instr->arg1);
                     int destOffset = get_memory_offset(instr->result);
                     
                     if (srcOffset >= 0 && destOffset >= 0) {
-                        fprintf(fp, "ld %s, %d($zero)\n", tempReg, srcOffset);
-                        fprintf(fp, "sd %s, %d($zero)\n", tempReg, destOffset);
+                        snprintf(asm_line, sizeof(asm_line), "ld %s, %d($zero)", tempReg, srcOffset);
+                        fprintf(fp, "%s\n", asm_line);
+                        
+                        int rt = get_register_number(tempReg);
+                        machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)srcOffset);
+                        if (hex_fp) {
+                            print_hex(hex_fp, machine_code);
+                            fprintf(hex_fp, "\n");
+                        }
+                        if (bin_fp) {
+                            print_binary(bin_fp, machine_code);
+                            fprintf(bin_fp, "\n");
+                        }
+                        
+                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d($zero)", tempReg, destOffset);
+                        fprintf(fp, "%s\n", asm_line);
+                        
+                        machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
+                    } else {
+                        has_machine_code = 0;
                     }
                 } else {
-                    /* Copy from temp to variable (store to memory) */
                     const char *srcReg = get_or_alloc_register(instr->arg1, NULL);
                     int destOffset = get_memory_offset(instr->result);
                     
-                    if (destOffset >= 0) {  /* Only store if it's a variable */
-                        fprintf(fp, "sd %s, %d($zero)\n", srcReg, destOffset);
+                    if (destOffset >= 0) {
+                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d($zero)", srcReg, destOffset);
+                        fprintf(fp, "%s\n", asm_line);
+                        
+                        int rt = get_register_number(srcReg);
+                        machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
+                    } else {
+                        has_machine_code = 0;
                     }
                 }
                 break;
             }
             
             default:
+                has_machine_code = 0;
                 break;
+        }
+        
+        // Write hex and binary representations
+        if (has_machine_code && strlen(asm_line) > 0) {
+            if (hex_fp) {
+                print_hex(hex_fp, machine_code);
+                fprintf(hex_fp, "\n");
+            }
+            if (bin_fp) {
+                print_binary(bin_fp, machine_code);
+                fprintf(bin_fp, "\n");
+            }
         }
     }
     
     fprintf(fp, "\n");
     fclose(fp);
+    
+    if (hex_fp) {
+        fclose(hex_fp);
+        printf("Hexadecimal code written to %s\n", hex_file);
+    }
+    
+    if (bin_fp) {
+        fclose(bin_fp);
+        printf("Binary code written to %s\n", binary_file);
+    }
+    
     printf("Assembly code written to %s\n", output_file);
 }
-
 //free function
 void tac_free(TACProgram *prog) {
     TACInstr *curr = prog->head;

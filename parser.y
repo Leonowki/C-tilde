@@ -121,38 +121,66 @@ decl_list:
 decl_item:
         /* Initialized declarations */
         TOK_NMBR TOK_IDENTIFIER TOK_ASSIGN expr {
-            Symbol *s = insert($2, TYPE_NMBR);
-            $$ = ast_create_decl(TYPE_NMBR, $2, $4, lineCount);
+            Symbol *s = insert($2, TYPE_NMBR, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;  // Error already reported
+            } else {
+                $$ = ast_create_decl(TYPE_NMBR, $2, $4, lineCount);
+            }
         }
         | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN TOK_CHAR_LITERAL {
-            Symbol *s = insert($2, TYPE_CHR);
-            ASTNode *init = ast_create_chr_lit($4, lineCount);
-            $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
+            Symbol *s = insert($2, TYPE_CHR, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;
+            } else {
+                ASTNode *init = ast_create_chr_lit($4, lineCount);
+                $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
+            }
         }
         | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN expr {
-            Symbol *s = insert($2, TYPE_FLEX);
-            $$ = ast_create_decl(TYPE_FLEX, $2, $4, lineCount);
+            Symbol *s = insert($2, TYPE_FLEX, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;
+            } else {
+                $$ = ast_create_decl(TYPE_FLEX, $2, $4, lineCount);
+            }
         }
         | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN TOK_CHAR_LITERAL {
-            Symbol *s = insert($2, TYPE_FLEX);
-            ASTNode *init = ast_create_chr_lit($4, lineCount);
-            $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
+            Symbol *s = insert($2, TYPE_FLEX, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;
+            } else {
+                ASTNode *init = ast_create_chr_lit($4, lineCount);
+                $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
+            }
         }
         /* Uninitialized declarations with default values */
         | TOK_NMBR TOK_IDENTIFIER {
-            Symbol *s = insert($2, TYPE_NMBR);
-            ASTNode *init = ast_create_num_lit(0, lineCount);
-            $$ = ast_create_decl(TYPE_NMBR, $2, init, lineCount);
+            Symbol *s = insert($2, TYPE_NMBR, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;
+            } else {
+                ASTNode *init = ast_create_num_lit(0, lineCount);
+                $$ = ast_create_decl(TYPE_NMBR, $2, init, lineCount);
+            }
         }
         | TOK_CHR TOK_IDENTIFIER {
-            Symbol *s = insert($2, TYPE_CHR);
-            ASTNode *init = ast_create_chr_lit('\0', lineCount);
-            $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
+            Symbol *s = insert($2, TYPE_CHR, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;
+            } else {
+                ASTNode *init = ast_create_chr_lit('\0', lineCount);
+                $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
+            }
         }
         | TOK_FLEX TOK_IDENTIFIER {
-            Symbol *s = insert($2, TYPE_FLEX);
-            ASTNode *init = ast_create_str_lit("", lineCount);
-            $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
+            Symbol *s = insert($2, TYPE_FLEX, lineCount, &error_count);
+            if (!s) {
+                $$ = NULL;
+            } else {
+                ASTNode *init = ast_create_str_lit("", lineCount);
+                $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
+            }
         }
         ;
 

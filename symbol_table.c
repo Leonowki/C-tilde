@@ -11,12 +11,19 @@ Symbol *lookup(const char *name) {
     return NULL;
 }
 
-Symbol *insert(const char *name, VarType type) {
+Symbol *insert(const char *name, VarType type, int line, int *error) {
     Symbol *s = lookup(name);
-    if (s) return s;
+    if (s) {
+        // Variable already exists - this is a redeclaration error
+        fprintf(stderr, "LINE %d: Variable '%s' is already declared (first declared as %s)\n", 
+                line, name, type_to_string(s->type));
+        if (error) *error = 1;
+        return NULL;  // Return NULL to indicate error
+    }
 
     if (symcount >= MAX_SYMBOLS) {
         fprintf(stderr, "Symbol table full\n");
+        if (error) *error = 1;
         return NULL;
     }
 
@@ -33,10 +40,11 @@ Symbol *insert(const char *name, VarType type) {
     else
         newSym->flexType = FLEX_NONE;
 
-    // NEW: Initialize memory info (will be computed later)
+    // Initialize memory info (will be computed later)
     newSym->memOffset = -1;
     newSym->size = get_size_for_type(type);
 
+    if (error) *error = 0;
     return newSym;
 }
 
@@ -83,8 +91,8 @@ FlexType get_runtime_type(Symbol *s) {
 // NEW: Get size in bytes for a variable type
 int get_size_for_type(VarType type) {
     switch (type) {
-        case TYPE_NMBR: return 4;  
-        case TYPE_CHR:  return 1;  
+        case TYPE_NMBR: return 8;  
+        case TYPE_CHR:  return 8;  
         case TYPE_FLEX: return 8;  
         default:        return 8;
     }
