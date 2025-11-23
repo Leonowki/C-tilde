@@ -2,9 +2,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include<stdbool.h>
 #include "symbol_table.h"
 #include "ast.h"
-
+#include "tac.h"
 
 extern int yylex();
 extern int yylineno;
@@ -15,6 +16,7 @@ void yyerror(const char *s);
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
+bool DEBUG_MODE = true;
 
 %}
 
@@ -243,14 +245,68 @@ void yyerror(const char *s) {
     error_count++;
 }
 
+
+
+int Semantic_analysis(){
+
+  printf("\n=== Semantic Analysis ===\n\n");
+        int semantic_errors = 0;
+        if (ast_check_semantics(root, &semantic_errors)) {
+            printf("Semantic analysis passed.\n");
+        } else {
+            printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
+            ast_free(root);
+            printf("\n=== Compilation Failed ===\n");
+            return 1;
+        }
+  return 0;//success
+
+}
+
+void print_symbol_table() {
+    printf("\n=== Symbol Table after Execution ===\n\n");
+    for (int i = 0; i < symcount; i++) {
+        Symbol *s = &symtab[i];
+        printf("%s (%s) = ", s->name, type_to_string(s->type));
+        if (s->type == TYPE_NMBR || (s->type == TYPE_FLEX && s->flexType == FLEX_NUMBER)) {
+            printf("%d\n", s->numVal);
+        } else if (s->type == TYPE_CHR || (s->type == TYPE_FLEX && s->flexType == FLEX_CHAR)) {
+            printf("'%c'\n", s->chrVal);
+        } else {
+            printf("(uninitialized)\n");
+        }
+    }
+}
 int main(int argc, char **argv) {
     int result = yyparse();
+
     if (result == 0 && root && error_count == 0) {
         printf("\n=== Abstract Syntax Tree ===\n\n");
         ast_print(root, 0);
+
+
+        // Semantic Analysis
+        if(Semantic_analysis()!=0){
+            return 1; //exit on semantic error
+        }
+
+        //TAC Generation and Execution
+        printf("\n=== Three-Address Code ===\n\n");
+        TACProgram *tac = tac_generate(root);  
+        tac_print(tac);
+        tac_execute(tac); 
+
+        //check symbol table values after execution
+        if(DEBUG_MODE) {
+            print_symbol_table();
+        }
+
+        
+        tac_free(tac);
         ast_free(root);
     }
+  
     
-    printf("\n=== Parsing Complete ===\n");
+  
     return 0;
 }

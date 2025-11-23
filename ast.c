@@ -111,8 +111,7 @@ ASTNode *ast_create_concat(ASTNode *left, ASTNode *right, int line) {
     return node;
 }
 
-/* NOTE: This function is not used in the current CFG. 
-   Remove it or fix it if you plan to use NODE_STMT_LIST */
+/* not used*/
 ASTNode *ast_create_stmt_list(ASTNode *left, ASTNode *right, int line) {
     ASTNode *node = ast_alloc(NODE_STMT_LIST, line);
     node->data.stmtList.stmts = NULL;
@@ -206,7 +205,117 @@ void ast_print(ASTNode *node, int indent) {
             printf("Unknown node type %d\n", node->type);
     }
 }
+/*CHECK SEMANTICS FOR COMMON SEMANTIC ERRORS*/
+static int is_constant_zero(ASTNode *node) {
+    if (!node) return 0;
+    
+    if (node->type == NODE_NUM_LIT && node->data.numVal == 0) {
+        return 1;
+    }
 
+    if (node->type == NODE_BINOP && node->data.binop.op == OP_MUL) {
+        /* 0 * anything = 0, anything * 0 = 0 */
+        if (is_constant_zero(node->data.binop.left) || 
+            is_constant_zero(node->data.binop.right)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+/* Recursively check semantics of expressions */
+static int check_expr_semantics(ASTNode *node, int *error_count) {
+    if (!node) return 1;
+    
+    switch (node->type) {
+        case NODE_NUM_LIT:
+        case NODE_CHR_LIT:
+        case NODE_STR_LIT:
+            return 1;
+            
+        case NODE_IDENT: {
+            /* Variable is already checked during parsing */
+            Symbol *s = lookup(node->data.strVal);
+            if (!s) {
+                fprintf(stderr, "LINE %d: Undefined variable '%s'\n", 
+                        node->line, node->data.strVal);
+                (*error_count)++;
+                return 0;
+            }
+            return 1;
+        }
+        
+        case NODE_BINOP: {
+            int valid = 1;
+            
+            /* Check left and right operands first */
+            valid &= check_expr_semantics(node->data.binop.left, error_count);
+            valid &= check_expr_semantics(node->data.binop.right, error_count);
+            
+            /* Check for division by zero */
+            if (node->data.binop.op == OP_DIV) {
+                if (is_constant_zero(node->data.binop.right)) {
+                    fprintf(stderr, "LINE %d: Division by zero detected\n", node->line);
+                    (*error_count)++;
+                    return 0;
+                }
+            }
+            
+            return valid;
+        }
+        
+        case NODE_CONCAT:
+            check_expr_semantics(node->data.shw.left, error_count);
+            check_expr_semantics(node->data.shw.right, error_count);
+            return 1;
+            
+        default:
+            return 1;
+    }
+}
+
+/*Main semantic checks*/
+int ast_check_semantics(ASTNode *node, int *error_count) {
+    if (!node) return 1;
+    
+    switch (node->type) {
+        case NODE_PROGRAM:
+            for (int i = 0; i < node->data.stmtList.count; i++) {
+                ast_check_semantics(node->data.stmtList.stmts[i], error_count);
+            }
+            break;
+            
+        case NODE_DECL:
+            if (node->data.decl.initExpr) {
+                check_expr_semantics(node->data.decl.initExpr, error_count);
+            }
+            break;
+            
+        case NODE_DECL_LIST:
+            ast_check_semantics(node->data.declList.left, error_count);
+            ast_check_semantics(node->data.declList.right, error_count);
+            break;
+            
+        case NODE_ASSIGN:
+            check_expr_semantics(node->data.assign.expr, error_count);
+            break;
+            
+        case NODE_COMPOUND_ASSIGN:
+            check_expr_semantics(node->data.assign.expr, error_count);
+            break;
+            
+        case NODE_SHW:
+            check_expr_semantics(node->data.shw.left, error_count);
+            break;
+            
+        default:
+            break;
+    }
+    
+    return (*error_count == 0);
+}
+
+/*Free AST*/
 void ast_free(ASTNode *node) {
     if (!node) return;
     switch (node->type) {

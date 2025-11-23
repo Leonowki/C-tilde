@@ -121,6 +121,7 @@ ASTNode *ast_create_stmt_list(ASTNode *left, ASTNode *right, int line);
 void ast_print(ASTNode *node, int indent);
 void ast_free(ASTNode *node);
 
+int ast_check_semantics(ASTNode *node, int *error_count);
 
 
 #endif
