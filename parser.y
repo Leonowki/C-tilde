@@ -74,6 +74,14 @@ program:
             root = $1; 
             $$ = $1;
         }
+    | line_list statement {  /* Allow final statement without newline at EOF */
+            $$ = ast_add_stmt($1, $2);
+        }
+    | statement {  /* NEW: Allow single statement without newline */
+            root = ast_create_program();
+            root = ast_add_stmt(root, $1);
+            $$ = root;
+        }
     | /* empty */ { 
             root = ast_create_program(); 
             $$ = root; 
@@ -94,8 +102,8 @@ line_list:
 
 line:
         statement TOK_NEWLINE   { $$ = $1; }
-        | TOK_NEWLINE             { $$ = NULL; }
-        | error TOK_NEWLINE       { error_count++; yyerrok; $$ = NULL; }
+        | TOK_NEWLINE           { $$ = NULL; }
+        | error TOK_NEWLINE     { error_count++; yyerrok; $$ = NULL; }
         ;
 
 statement:

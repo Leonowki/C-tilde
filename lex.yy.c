@@ -770,7 +770,7 @@ YY_RULE_SETUP
 /* Number literals */
 case 12:
 YY_RULE_SETUP
-#line 62 "lexer.l"
+#line 63 "lexer.l"
 {
             yylval.num = atoi(yytext);
             return TOK_NUMBER_LITERAL;
@@ -779,100 +779,100 @@ YY_RULE_SETUP
 /* Compound assignment operators (must come before single char operators) */
 case 13:
 YY_RULE_SETUP
-#line 68 "lexer.l"
+#line 69 "lexer.l"
 { return TOK_PLUS_ASSIGN; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 69 "lexer.l"
+#line 70 "lexer.l"
 { return TOK_MINUS_ASSIGN; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 70 "lexer.l"
+#line 71 "lexer.l"
 { return TOK_MULT_ASSIGN; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 71 "lexer.l"
+#line 72 "lexer.l"
 { return TOK_DIV_ASSIGN; }
 	YY_BREAK
 /* Single char operators and delimiters */
 case 17:
 YY_RULE_SETUP
-#line 74 "lexer.l"
+#line 75 "lexer.l"
 { return TOK_ASSIGN; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 75 "lexer.l"
+#line 76 "lexer.l"
 { return TOK_CONCAT; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 76 "lexer.l"
+#line 77 "lexer.l"
 { return TOK_PLUS; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 77 "lexer.l"
+#line 78 "lexer.l"
 { return TOK_MINUS; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 78 "lexer.l"
+#line 79 "lexer.l"
 { return TOK_MULT; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 79 "lexer.l"
+#line 80 "lexer.l"
 { return TOK_DIV; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 80 "lexer.l"
+#line 81 "lexer.l"
 { return TOK_COMMA; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 81 "lexer.l"
+#line 82 "lexer.l"
 { return TOK_LPAREN; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 82 "lexer.l"
+#line 83 "lexer.l"
 { return TOK_RPAREN; }
 	YY_BREAK
 /* Character literals - escape sequences */
 case 26:
 YY_RULE_SETUP
-#line 85 "lexer.l"
+#line 86 "lexer.l"
 { yylval.ch = '\n'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 27:
 YY_RULE_SETUP
-#line 86 "lexer.l"
+#line 87 "lexer.l"
 { yylval.ch = '\t'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 87 "lexer.l"
+#line 88 "lexer.l"
 { yylval.ch = '\\'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 88 "lexer.l"
+#line 89 "lexer.l"
 { yylval.ch = '\''; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 89 "lexer.l"
+#line 90 "lexer.l"
 { yylval.ch = '\0'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 /* Character literals - regular */
 case 31:
 YY_RULE_SETUP
-#line 92 "lexer.l"
+#line 93 "lexer.l"
 {
             yylval.ch = yytext[1];
             return TOK_CHAR_LITERAL;
@@ -881,7 +881,7 @@ YY_RULE_SETUP
 /* String literals */
 case 32:
 YY_RULE_SETUP
-#line 98 "lexer.l"
+#line 99 "lexer.l"
 {
             yylval.str = unquote_string(yytext);
             return TOK_STRING_LITERAL;
@@ -890,7 +890,7 @@ YY_RULE_SETUP
 /* Identifiers */
 case 33:
 YY_RULE_SETUP
-#line 104 "lexer.l"
+#line 105 "lexer.l"
 {
             yylval.str = strdup(yytext);
             return TOK_IDENTIFIER;
@@ -899,18 +899,18 @@ YY_RULE_SETUP
 /* Whitespace */
 case 34:
 YY_RULE_SETUP
-#line 110 "lexer.l"
+#line 111 "lexer.l"
 ;
 	YY_BREAK
 /* Unknown characters */
 case 35:
 YY_RULE_SETUP
-#line 113 "lexer.l"
+#line 114 "lexer.l"
 
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 115 "lexer.l"
+#line 116 "lexer.l"
 ECHO;
 	YY_BREAK
 #line 917 "lex.yy.c"
@@ -1798,7 +1798,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 115 "lexer.l"
+#line 116 "lexer.l"
 
 
 int yywrap(void) {

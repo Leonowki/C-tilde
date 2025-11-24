@@ -58,6 +58,7 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
     /* Newline as delimiter */
 \n        { return TOK_NEWLINE; }
 
+
     /* Number literals */
 {DIGIT}+  {
             yylval.num = atoi(yytext);
