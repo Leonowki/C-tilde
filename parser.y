@@ -75,9 +75,10 @@ program:
             $$ = $1;
         }
     | line_list statement {  /* Allow final statement without newline at EOF */
-            $$ = ast_add_stmt($1, $2);
+            root = ast_add_stmt($1, $2);  /* ADD: Set root here too */
+            $$ = root;
         }
-    | statement {  /* NEW: Allow single statement without newline */
+    | statement {  /* Allow single statement without newline */
             root = ast_create_program();
             root = ast_add_stmt(root, $1);
             $$ = root;
@@ -88,18 +89,24 @@ program:
         }
     ;
 
+
 line_list:
         line_list line {
-            $$ = ast_add_stmt($1, $2);
+            if ($2 != NULL) {
+                $$ = ast_add_stmt($1, $2);
+            } else {
+                $$ = $1;
+            }
             lineCount++;
         }
         | line {
             $$ = ast_create_program();
-            $$ = ast_add_stmt($$, $1);
+            if ($1 != NULL) {
+                $$ = ast_add_stmt($$, $1);
+            }
             lineCount++;
         }
         ;
-
 line:
         statement TOK_NEWLINE   { $$ = $1; }
         | TOK_NEWLINE           { $$ = NULL; }
@@ -345,6 +352,7 @@ void print_symbol_table() {
 }
 int main(int argc, char **argv) {
     int result = yyparse();
+    
 
     if (result == 0 && root && error_count == 0) {
         printf("\n=== Abstract Syntax Tree ===\n\n");
@@ -363,6 +371,7 @@ int main(int argc, char **argv) {
 
         //check symbol table values after execution
         if(DEBUG_MODE) {
+            printf("Parse result: %d, root: %p, error_count: %d\n", result, (void*)root, error_count);
             //Compute memory offsets for all variables
             compute_symbol_offsets();
             print_symbol_table();
