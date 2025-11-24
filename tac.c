@@ -1026,9 +1026,9 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
     }
     
     // Print all outputs to console
-    printf("assembly:\n%s", assembly_output);
-    printf("\nbinary:\n%s", binary_output);
-    printf("\nhex:\n%s", hex_output);
+    printf("assembly:\n\"%s\",", assembly_output);
+    printf("\nbinary:\n\"%s\",", binary_output);
+    printf("\nhex:\n\"%s\"", hex_output);
 }
 //free function
 void tac_free(TACProgram *prog) {

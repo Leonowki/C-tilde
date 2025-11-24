@@ -366,8 +366,10 @@ int main(int argc, char **argv) {
         //TAC Generation and Execution
         TACProgram *tac = tac_generate(root);  
         printf("console:");
+        printf("\"");
         tac_execute(tac); 
-        printf("\n\n--end of console output--\n\n\n");
+        printf("\",\n");
+        
 
 
         //check symbol table values after execution
