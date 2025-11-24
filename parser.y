@@ -16,7 +16,7 @@ void yyerror(const char *s);
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
-bool DEBUG_MODE = true;
+bool DEBUG_MODE = false;
 
 %}
 
@@ -302,15 +302,15 @@ void yyerror(const char *s) {
 
 
 int Semantic_analysis(){
+    if(DEBUG_MODE)  printf("\n=== Semantic Analysis ===\n\n");
 
-    printf("\n=== Semantic Analysis ===\n\n");
             int semantic_errors = 0;
             if (ast_check_semantics(root, &semantic_errors)) {
-                printf("Semantic analysis passed.\n");
+                if(DEBUG_MODE) printf("Semantic analysis passed.\n");
             } else {
-                printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
+                if(DEBUG_MODE) printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
                 ast_free(root);
-                printf("\n=== Compilation Failed ===\n");
+                if(DEBUG_MODE) printf("\n=== Compilation Failed ===\n");
                 return 1;
             }
     return 0;//success
@@ -355,8 +355,8 @@ int main(int argc, char **argv) {
     
 
     if (result == 0 && root && error_count == 0) {
-        printf("\n=== Abstract Syntax Tree ===\n\n");
-        ast_print(root, 0);
+        /* printf("\n=== Abstract Syntax Tree ===\n\n"); */
+        if (DEBUG_MODE) ast_print(root, 0);
 
         // Semantic Analysis
         if(Semantic_analysis()!=0){
@@ -364,22 +364,27 @@ int main(int argc, char **argv) {
         }
 
         //TAC Generation and Execution
-        printf("\n=== Three-Address Code ===\n\n");
         TACProgram *tac = tac_generate(root);  
-        tac_print(tac);
+        printf("console:");
         tac_execute(tac); 
+        printf("\n\n--end of console output--\n\n\n");
+
 
         //check symbol table values after execution
         if(DEBUG_MODE) {
+            printf("\n=== Three-Address Code ===\n\n");
+            tac_print(tac);
             printf("Parse result: %d, root: %p, error_count: %d\n", result, (void*)root, error_count);
             //Compute memory offsets for all variables
             compute_symbol_offsets();
             print_symbol_table();
         }
-
-        // Assembly Code Generation
-        printf("\n=== Generating Assembly Code ===\n\n");
+        
         tac_generate_assembly(tac, "output.s");
+
+        if(DEBUG_MODE) {
+            printf("\n=== Assembly Code Generated: output.s ===\n");
+        }
 
         tac_free(tac);
         ast_free(root);

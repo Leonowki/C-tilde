@@ -83,5 +83,6 @@ void tac_execute(TACProgram *prog);
 
 //assembly code generation
 void tac_generate_assembly(TACProgram *prog, const char *filename);
+void tac_gen_shw_expr(TACProgram *prog, ASTNode *node, int line);
 
 #endif
