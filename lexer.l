@@ -111,7 +111,11 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 [ \t\r]+  ;
 
     /* Unknown characters */
-.         
+.          { 
+            fprintf(stderr, "Error at line %d: Unexpected character '%s'\n", 
+                    yylineno, yytext);
+            exit(1);
+        }
 
 %%
 

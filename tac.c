@@ -280,7 +280,22 @@ static int get_operand_value(TACOperand op, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
-                return s->numVal;
+                // Return ASCII value for chr type
+                if (s->type == TYPE_CHR) {
+                    return (int)s->chrVal;
+                }
+                // For flex, check runtime type
+                else if (s->type == TYPE_FLEX) {
+                    if (s->flexType == FLEX_CHAR) {
+                        return (int)s->chrVal;
+                    } else {
+                        return s->numVal;
+                    }
+                }
+                // For nmbr
+                else {
+                    return s->numVal;
+                }
             }
             return 0;
         }
@@ -298,8 +313,19 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
+                // For flex types, determine the type based on the value being set
+                if (s->type == TYPE_FLEX) {
+                    // If the value looks like an ASCII printable char, store as char
+                    // Otherwise store as number
+                    if (value >= 0 && value <= 127) {
+                        // Could be either - we'll default to number for arithmetic results
+                        set_number(s, value);
+                    } else {
+                        set_number(s, value);
+                    }
+                }
                 // Use appropriate setter based on variable type
-                if (s->type == TYPE_CHR) {
+                else if (s->type == TYPE_CHR) {
                     set_char(s, (char)value);
                 } else {
                     set_number(s, value);
@@ -311,7 +337,6 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
             break;
     }
 }
-
 void tac_execute(TACProgram *prog) {
     if (!prog || !prog->head) return;
     

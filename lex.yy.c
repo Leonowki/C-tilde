@@ -906,14 +906,18 @@ YY_RULE_SETUP
 case 35:
 YY_RULE_SETUP
 #line 114 "lexer.l"
-
+{ 
+            fprintf(stderr, "Error at line %d: Unexpected character '%s'\n", 
+                    yylineno, yytext);
+            exit(1);
+        }
 	YY_BREAK
 case 36:
 YY_RULE_SETUP
-#line 116 "lexer.l"
+#line 120 "lexer.l"
 ECHO;
 	YY_BREAK
-#line 917 "lex.yy.c"
+#line 921 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(COMMENT):
 				yyterminate();
@@ -1798,7 +1802,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 116 "lexer.l"
+#line 120 "lexer.l"
 
 
 int yywrap(void) {
