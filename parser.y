@@ -377,11 +377,11 @@ int main(int argc, char **argv) {
             printf("\n=== Three-Address Code ===\n\n");
             tac_print(tac);
             printf("Parse result: %d, root: %p, error_count: %d\n", result, (void*)root, error_count);
-            //Compute memory offsets for all variables
-            compute_symbol_offsets();
             print_symbol_table();
         }
         
+        //Compute memory offsets for all variables
+        compute_symbol_offsets();
         tac_generate_assembly(tac, "output.s");
 
         if(DEBUG_MODE) {

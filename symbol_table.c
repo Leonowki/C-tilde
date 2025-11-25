@@ -1,7 +1,9 @@
 #include "symbol_table.h"
-
+#include<stdbool.h>
 Symbol symtab[MAX_SYMBOLS];
 int symcount = 0;
+
+bool DEBUG_MODE_SYMB = false;
 
 Symbol *lookup(const char *name) {
     for (int i = 0; i < symcount; i++) {
@@ -98,20 +100,21 @@ int get_size_for_type(VarType type) {
     }
 }
 
-// NEW: Compute memory offsets for all symbols
-// Call this after parsing is complete, before TAC generation
+//after parsing is complete, before TAC generation
 void compute_symbol_offsets(void) {
     int currentOffset = 0;
-    
+    //compute offsets
     for (int i = 0; i < symcount; i++) {
         symtab[i].memOffset = currentOffset;
         currentOffset += symtab[i].size;
     }
     
-    printf("\n=== Memory Layout ===\n");
-    for (int i = 0; i < symcount; i++) {
-        printf("%s: offset=%d, size=%d bytes\n", 
-               symtab[i].name, symtab[i].memOffset, symtab[i].size);
+    if(DEBUG_MODE_SYMB){
+        printf("\n=== Memory Layout ===\n");
+        for (int i = 0; i < symcount; i++) {
+            printf("%s: offset=%d, size=%d bytes\n", 
+                symtab[i].name, symtab[i].memOffset, symtab[i].size);
+        }
+        printf("Total memory required: %d bytes\n\n", currentOffset);
     }
-    printf("Total memory required: %d bytes\n\n", currentOffset);
 }
