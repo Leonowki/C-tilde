@@ -82,6 +82,8 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 "("       { return TOK_LPAREN; }
 ")"       { return TOK_RPAREN; }
 
+\\[ \t]*\r?\n   { /* ignore backslash + optional spaces + newline */ }
+
     /* Character literals - escape sequences */
 '\\n'     { yylval.ch = '\n'; return TOK_CHAR_LITERAL; }
 '\\t'     { yylval.ch = '\t'; return TOK_CHAR_LITERAL; }
@@ -101,11 +103,14 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
             return TOK_STRING_LITERAL;
           }
 
+  
+
     /* Identifiers */
 {ID}      {
             yylval.str = strdup(yytext);
             return TOK_IDENTIFIER;
           }
+
 
     /* Whitespace */
 [ \t\r]+  ;
