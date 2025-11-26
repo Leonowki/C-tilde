@@ -246,6 +246,7 @@ compound_assign:
         }
     ;
 
+//with explicit arithmetic in shw
 shw_statement:
         TOK_SHW shw_expr {
             $$ = ast_create_shw($2, lineCount);
@@ -261,36 +262,37 @@ shw_expr:
 
 shw_item:
         TOK_STRING_LITERAL  { $$ = ast_create_str_lit($1, lineCount); }
-        | TOK_IDENTIFIER      { $$ = ast_create_ident($1, lineCount); }
-        | TOK_NUMBER_LITERAL  { $$ = ast_create_num_lit($1, lineCount); }
-        ;
+        | expr              { $$ = $1; }
+    ;
 
 expr:
         expr TOK_PLUS term      { $$ = ast_create_binop(OP_ADD, $1, $3, lineCount); }
-        | expr TOK_MINUS term     { $$ = ast_create_binop(OP_SUB, $1, $3, lineCount); }
-        | term
+        | expr TOK_MINUS term   { $$ = ast_create_binop(OP_SUB, $1, $3, lineCount); }
+        | term                  { $$ = $1; }
     ;
 
 term:
         term TOK_MULT factor    { $$ = ast_create_binop(OP_MUL, $1, $3, lineCount); }
-        | term TOK_DIV factor     { $$ = ast_create_binop(OP_DIV, $1, $3, lineCount); }
-        | factor
+        | term TOK_DIV factor   { $$ = ast_create_binop(OP_DIV, $1, $3, lineCount); }
+        | factor                { $$ = $1; }
     ;
 
 factor:
         TOK_NUMBER_LITERAL        { $$ = ast_create_num_lit($1, lineCount); }
-        | TOK_IDENTIFIER            { $$ = ast_create_ident($1, lineCount); }
+        | TOK_IDENTIFIER          { $$ = ast_create_ident($1, lineCount); }
         | TOK_LPAREN expr TOK_RPAREN { $$ = $2; }
-        | TOK_MINUS factor          {
+        | TOK_MINUS factor        {
             /* Unary minus: 0 - factor */
             ASTNode *zero = ast_create_num_lit(0, lineCount);
             $$ = ast_create_binop(OP_SUB, zero, $2, lineCount);
         }
-        | TOK_PLUS factor           {
+        | TOK_PLUS factor         {
             /* Unary plus: just return factor */
             $$ = $2;
         }
     ;
+
+
 
 %%
 
