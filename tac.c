@@ -225,9 +225,56 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
     }
 }
 
+static void optimize_simple_assignments(TACProgram *prog) {
+    TACInstr *curr = prog->head;
+    
+    while (curr && curr->next) {
+        TACInstr *next = curr->next;
+        
+        // Pattern: LOAD_INT into temp, immediately COPY temp to var
+        if (curr->op == TAC_LOAD_INT && 
+            curr->result.type == OPERAND_TEMP &&
+            next->op == TAC_COPY &&
+            next->arg1.type == OPERAND_TEMP &&
+            next->arg1.val.tempNum == curr->result.val.tempNum) {
+            
+            // Check if this temp is used anywhere else
+            int tempNum = curr->result.val.tempNum;
+            int usedElsewhere = 0;
+            
+            TACInstr *check = next->next;
+            while (check) {
+                if ((check->arg1.type == OPERAND_TEMP && check->arg1.val.tempNum == tempNum) ||
+                    (check->arg2.type == OPERAND_TEMP && check->arg2.val.tempNum == tempNum)) {
+                    usedElsewhere = 1;
+                    break;
+                }
+                check = check->next;
+            }
+            
+            // If temp is only used once, merge the operations
+            if (!usedElsewhere) {
+                // Change LOAD_INT to directly target the variable
+                curr->result = next->result;
+                
+                // Remove the COPY instruction
+                curr->next = next->next;
+                free(next);
+                
+                continue; // Don't advance curr, check for more patterns
+            }
+        }
+        curr = curr->next;
+    }
+}
+
+
 TACProgram *tac_generate(ASTNode *ast) {
     TACProgram *prog = tac_create_program();
     tac_gen_stmt(prog, ast);
+
+    optimize_simple_assignments(prog);
+
     return prog;
 }
 
@@ -361,7 +408,6 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
     }
 }
 
-/* Helper function to print an operand value */
 /* Helper function to print an operand value */
 static void print_operand_value(TACOperand op, int *tempValues, TACProgram *prog) {
     switch (op.type) {
@@ -499,59 +545,6 @@ void tac_execute(TACProgram *prog) {
     free(tempValues);
 }
 
-static const char* get_next_register(void) {
-    static const char* registers[] = {
-        "$t0", "$t1", "$t2", "$t3", "$t4", 
-        "$t5", "$t6", "$t7", "$t8", "$t9"
-    };
-    const char* reg = registers[next_register % 10];
-    next_register++;
-    return reg;
-}
-
-static const char* get_or_alloc_register(TACOperand op, RegAlloc **allocOut) {
-    char key[64];
-    int isVar = 0;
-    
-    switch (op.type) {
-        case OPERAND_TEMP:
-            sprintf(key, "t%d", op.val.tempNum);
-            isVar = 0;
-            break;
-        case OPERAND_VAR:
-            sprintf(key, "%s", op.val.varName);
-            isVar = 1;
-            break;
-        default:
-            return NULL;
-    }
-    
-    /* Check if already allocated */
-    for (int i = 0; i < regMapCount; i++) {
-        if (strcmp(regMap[i].name, key) == 0) {
-            if (allocOut) *allocOut = &regMap[i];
-            return regMap[i].reg;
-        }
-    }
-    
-    /* Allocate new register */
-    RegAlloc *alloc = &regMap[regMapCount++];
-    strcpy(alloc->name, key);
-    alloc->reg = get_next_register();
-    alloc->isVariable = isVar;
-    
-    /* Only variables get memory offsets, not temporaries */
-    if (isVar) {
-        alloc->memOffset = nextMemOffset;
-        nextMemOffset += 8; /* 8 bytes per word in MIPS64 */
-    } else {
-        alloc->memOffset = -1; /* Temps don't have memory */
-    }
-    
-    if (allocOut) *allocOut = alloc;
-    return alloc->reg;
-}
-
 /* Get memory offset for variable/temp */
 static int get_memory_offset(TACOperand op) {
     if (op.type == OPERAND_VAR) {
@@ -616,6 +609,7 @@ static void print_hex(FILE *fp, uint32_t value) {
     fprintf(fp, "0x%08X", value);
 }
 
+/* Optimize consecutive LOAD_INT -> COPY sequences */
 
 /* Generate EduMIPS64 assembly and binary code */
 void tac_generate_assembly(TACProgram *prog, const char *output_file) {
@@ -659,12 +653,23 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
                 strcat(binary_output, bin_str);
                 strcat(binary_output, "\n");
                 
-                // Store to temp location
-                int tempOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                snprintf(asm_line, sizeof(asm_line), "sd %s, %d($zero)\n", destReg, tempOffset);
+                // Determine storage location based on result type
+                int destOffset;
+                if (instr->result.type == OPERAND_VAR) {
+                    // Direct variable assignment (optimized case)
+                    destOffset = get_memory_offset(instr->result);
+                } else if (instr->result.type == OPERAND_TEMP) {
+                    // Temp for complex expression
+                    destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
+                } else {
+                    has_machine_code = 0;
+                    break;
+                }
+                
+                snprintf(asm_line, sizeof(asm_line), "sd %s, %d($zero)\n", destReg, destOffset);
                 strcat(assembly_output, asm_line);
                 
-                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)tempOffset);
+                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
                 
                 sprintf(hex_str, "0x%08X\n", machine_code);
                 strcat(hex_output, hex_str);
