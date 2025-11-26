@@ -3,7 +3,7 @@
 Symbol symtab[MAX_SYMBOLS];
 int symcount = 0;
 
-bool DEBUG_MODE_SYMB = true;
+bool DEBUG_MODE_SYMB = false;
 
 Symbol *lookup(const char *name) {
     for (int i = 0; i < symcount; i++) {

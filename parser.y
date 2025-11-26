@@ -17,7 +17,7 @@ void yyerror(const char *s);
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
-bool DEBUG_MODE = true;
+bool DEBUG_MODE = false;
 
 %}
 
