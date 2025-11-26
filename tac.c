@@ -61,6 +61,12 @@ static const char* get_temp_register(int tempNum) {
     return regs[idx];
 }
 
+static TACInstr *tac_emit_shw(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TACOperand a2, int line) {
+    TACInstr *instr = tac_emit(prog, op, res, a1, a2, line);
+    instr->inShwContext = 1;  /* Mark as shw-only */
+    return instr;
+}
+
 /* Check if we need to store this temp to memory (it's used later) */
 static int temp_needs_memory(TACProgram *prog, TACInstr *current, int tempNum) {
     // If result is a variable, it always needs memory
@@ -127,6 +133,7 @@ TACInstr *tac_emit(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TA
     instr->arg1 = a1;
     instr->arg2 = a2;
     instr->line = line;
+    instr->inShwContext = 0;
     instr->next = NULL;
 
     if (!prog->head) {
@@ -138,36 +145,47 @@ TACInstr *tac_emit(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TA
     return instr;
 }
 
-/* Generate TAC for expressions, returns the operand holding the result */
-TACOperand tac_gen_expr(TACProgram *prog, ASTNode *node) {
+/* Generate TAC for expressions, returns the operand holding the result helper for cases using shw context */
+TACOperand tac_gen_expr_ctx(TACProgram *prog, ASTNode *node, int inShwContext) {
     if (!node) return tac_operand_none();
 
     switch (node->type) {
         case NODE_NUM_LIT: {
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
-            tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int(node->data.numVal), tac_operand_none(), node->line);
+            if (inShwContext) {
+                tac_emit_shw(prog, TAC_LOAD_INT, res, tac_operand_int(node->data.numVal), tac_operand_none(), node->line);
+            } else {
+                tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int(node->data.numVal), tac_operand_none(), node->line);
+            }
             return res;
         }
         case NODE_CHR_LIT: {
-            /* Convert character to ASCII value */
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
-            tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
+            if (inShwContext) {
+                tac_emit_shw(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
+            } else {
+                tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
+            }
             return res;
         }
         case NODE_STR_LIT: {
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
-            tac_emit(prog, TAC_LOAD_STR, res, tac_operand_str(node->data.strVal), tac_operand_none(), node->line);
+            if (inShwContext) {
+                tac_emit_shw(prog, TAC_LOAD_STR, res, tac_operand_str(node->data.strVal), tac_operand_none(), node->line);
+            } else {
+                tac_emit(prog, TAC_LOAD_STR, res, tac_operand_str(node->data.strVal), tac_operand_none(), node->line);
+            }
             return res;
         }
         case NODE_IDENT: {
             return tac_operand_var(node->data.strVal);
         }
         case NODE_BINOP: {
-            TACOperand left = tac_gen_expr(prog, node->data.binop.left);
-            TACOperand right = tac_gen_expr(prog, node->data.binop.right);
+            TACOperand left = tac_gen_expr_ctx(prog, node->data.binop.left, inShwContext);
+            TACOperand right = tac_gen_expr_ctx(prog, node->data.binop.right, inShwContext);
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
             TACOp op;
@@ -178,23 +196,27 @@ TACOperand tac_gen_expr(TACProgram *prog, ASTNode *node) {
                 case OP_DIV: op = TAC_DIV; break;
                 default: op = TAC_ADD; break;
             }
-            tac_emit(prog, op, res, left, right, node->line);
+            if (inShwContext) {
+                tac_emit_shw(prog, op, res, left, right, node->line);
+            } else {
+                tac_emit(prog, op, res, left, right, node->line);
+            }
             return res;
         }
         case NODE_CONCAT: {
-            //emit instructions for both sides
-            // and track them for printing
-            TACOperand left = tac_gen_expr(prog, node->data.shw.left);
-            TACOperand right = tac_gen_expr(prog, node->data.shw.right);
-            
-            // Emit CONCAT instruction to mark these should be printed together
-            tac_emit(prog, TAC_CONCAT, tac_operand_none(), left, right, node->line);
-            
+            TACOperand left = tac_gen_expr_ctx(prog, node->data.shw.left, inShwContext);
+            TACOperand right = tac_gen_expr_ctx(prog, node->data.shw.right, inShwContext);
+            tac_emit_shw(prog, TAC_CONCAT, tac_operand_none(), left, right, node->line);
             return tac_operand_none();
         }
         default:
             return tac_operand_none();
     }
+}
+
+
+TACOperand tac_gen_expr(TACProgram *prog, ASTNode *node) {
+    return tac_gen_expr_ctx(prog, node, 0);  /* Default: not in shw context */
 }
 
 /* Generate TAC for shw expressions - handles concatenation */
@@ -206,12 +228,11 @@ void tac_gen_shw_expr(TACProgram *prog, ASTNode *node, int line) {
         tac_gen_shw_expr(prog, node->data.shw.left, line);
         tac_gen_shw_expr(prog, node->data.shw.right, line);
     } else {
-        // Leaf node - generate expression and emit print
-        TACOperand val = tac_gen_expr(prog, node);
-        tac_emit(prog, TAC_CONCAT, tac_operand_none(), val, tac_operand_none(), line);
+        // Leaf node - generate expression with shw context flag
+        TACOperand val = tac_gen_expr_ctx(prog, node, 1);  
+        tac_emit_shw(prog, TAC_CONCAT, tac_operand_none(), val, tac_operand_none(), line);
     }
 }
-
 /* Generate TAC for statements */
 void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
     if (!node) return;
@@ -445,11 +466,11 @@ static int get_operand_value(TACOperand op, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
-                // Return ASCII value for chr type
+                /* FIX: For chr type, return ASCII value as integer for arithmetic */
                 if (s->type == TYPE_CHR) {
                     return (int)s->chrVal;
                 }
-                // For flex, check runtime type
+                /* For flex, check runtime type */
                 else if (s->type == TYPE_FLEX) {
                     if (s->flexType == FLEX_CHAR) {
                         return (int)s->chrVal;
@@ -457,7 +478,7 @@ static int get_operand_value(TACOperand op, int *tempValues) {
                         return s->numVal;
                     }
                 }
-                // For nmbr
+                /* For nmbr */
                 else {
                     return s->numVal;
                 }
@@ -721,6 +742,10 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
     
     /* Generate code for each TAC instruction */
     for (TACInstr *instr = prog->head; instr; instr = instr->next) {
+        //not generate code for shw-only instructions
+        if (instr->inShwContext) {
+            continue;
+        }
         char asm_line[256] = "";
         uint32_t machine_code = 0;
         int has_machine_code = 1;

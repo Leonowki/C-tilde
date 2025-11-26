@@ -45,6 +45,7 @@ typedef struct TACInstr {
     TACOperand arg1;
     TACOperand arg2;
     int line;
+    int inShwContext; 
     struct TACInstr *next;
 } TACInstr;
 

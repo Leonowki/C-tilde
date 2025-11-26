@@ -17,7 +17,7 @@ void yyerror(const char *s);
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
-bool DEBUG_MODE = false;
+bool DEBUG_MODE = true;
 
 %}
 
@@ -144,13 +144,13 @@ decl_item:
                 $$ = ast_create_decl(TYPE_NMBR, $2, $4, lineCount);
             }
         }
-        | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN TOK_CHAR_LITERAL {
+        /* FIX: chr accepts expr (which includes char literals via factor rule) */
+        | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN expr {
             Symbol *s = insert($2, TYPE_CHR, lineCount, &error_count);
             if (!s) {
                 $$ = NULL;
             } else {
-                ASTNode *init = ast_create_chr_lit($4, lineCount);
-                $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
+                $$ = ast_create_decl(TYPE_CHR, $2, $4, lineCount);
             }
         }
         | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN expr {
@@ -159,15 +159,6 @@ decl_item:
                 $$ = NULL;
             } else {
                 $$ = ast_create_decl(TYPE_FLEX, $2, $4, lineCount);
-            }
-        }
-        | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN TOK_CHAR_LITERAL {
-            Symbol *s = insert($2, TYPE_FLEX, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                ASTNode *init = ast_create_chr_lit($4, lineCount);
-                $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
             }
         }
         /* Uninitialized declarations with default values */
@@ -279,6 +270,7 @@ term:
 
 factor:
         TOK_NUMBER_LITERAL        { $$ = ast_create_num_lit($1, lineCount); }
+        | TOK_CHAR_LITERAL        { $$ = ast_create_chr_lit($1, lineCount); }
         | TOK_IDENTIFIER          { $$ = ast_create_ident($1, lineCount); }
         | TOK_LPAREN expr TOK_RPAREN { $$ = $2; }
         | TOK_MINUS factor        {

@@ -3,7 +3,7 @@
 Symbol symtab[MAX_SYMBOLS];
 int symcount = 0;
 
-bool DEBUG_MODE_SYMB = false;
+bool DEBUG_MODE_SYMB = true;
 
 Symbol *lookup(const char *name) {
     for (int i = 0; i < symcount; i++) {
@@ -64,7 +64,14 @@ void set_number(Symbol *s, int value) {
         free(s->strVal);
         s->strVal = NULL;
     }
-    s->numVal = value;
+    
+    /* FIX: For chr type, store as character but allow integer assignment */
+    if (s->type == TYPE_CHR) {
+        s->chrVal = (char)value;  // Store as char
+        s->numVal = value;         // Also store integer value for consistency
+    } else {
+        s->numVal = value;
+    }
 
     if (s->type == TYPE_FLEX)
         s->flexType = FLEX_NUMBER;
@@ -90,7 +97,7 @@ FlexType get_runtime_type(Symbol *s) {
     }
 }
 
-// NEW: Get size in bytes for a variable type
+// Get size in bytes for a variable type
 int get_size_for_type(VarType type) {
     switch (type) {
         case TYPE_NMBR: return 8;  
