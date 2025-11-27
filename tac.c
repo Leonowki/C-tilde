@@ -74,19 +74,53 @@ static int temp_needs_memory(TACProgram *prog, TACInstr *current, int tempNum) {
         return 1;
     }
     
-    // Check if this temp is used after the next instruction
+    // Count how many instructions ahead this temp is used
+    int useCount = 0;
+    int instructionsAhead = 0;
     TACInstr *check = current->next;
-    if (check) check = check->next;  // Skip immediate next
     
     while (check) {
+        instructionsAhead++;
+        
+        // Check if this temp is used as an operand
         if ((check->arg1.type == OPERAND_TEMP && check->arg1.val.tempNum == tempNum) ||
             (check->arg2.type == OPERAND_TEMP && check->arg2.val.tempNum == tempNum)) {
+            useCount++;
+            
+            // If used only once and within the next few instructions, keep in register
+            if (useCount == 1 && instructionsAhead <= 3) {
+                // Check if it's used again after this
+                TACInstr *furtherCheck = check->next;
+                int usedAgain = 0;
+                while (furtherCheck) {
+                    if ((furtherCheck->arg1.type == OPERAND_TEMP && furtherCheck->arg1.val.tempNum == tempNum) ||
+                        (furtherCheck->arg2.type == OPERAND_TEMP && furtherCheck->arg2.val.tempNum == tempNum)) {
+                        usedAgain = 1;
+                        break;
+                    }
+                    furtherCheck = furtherCheck->next;
+                }
+                
+                if (!usedAgain) {
+                    return 0;  // Don't need memory - single use within register window
+                }
+            }
+            
+            // If used multiple times or far away, needs memory
             return 1;
         }
+        
+        // Don't look too far ahead for register-only temps
+        if (instructionsAhead > 10) {
+            break;
+        }
+        
         check = check->next;
     }
     
-    return 0;
+    // If temp is never used after creation, don't store it
+    // (This handles dead code that optimizations might have missed)
+    return useCount > 0;
 }
 
 TACProgram *tac_create_program(void) {

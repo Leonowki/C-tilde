@@ -6,7 +6,7 @@
 #include "symbol_table.h"
 #include "ast.h"
 #include "tac.h"
-#include <windows.h>
+
 
 extern int yylex();
 extern int yylineno;
@@ -347,9 +347,6 @@ void print_symbol_table() {
 }
 int main(int argc, char **argv) {
 
-    LARGE_INTEGER freq, start, end;
-    QueryPerformanceFrequency(&freq);
-    QueryPerformanceCounter(&start);
 
     int result = yyparse();
     
@@ -365,14 +362,11 @@ int main(int argc, char **argv) {
 
         //TAC Generation and Execution
         TACProgram *tac = tac_generate(root);
-        QueryPerformanceCounter(&end);
-        double ms = (double)(end.QuadPart - start.QuadPart) * 1000.0 / freq.QuadPart;  
         printf("console:");
         printf("\"");
         //Compute memory offsets for all variables
         compute_symbol_offsets();
         tac_execute(tac); 
-        printf("Execution time: %.3f ms\n", ms);
         printf("\",\n");
         
         //check symbol table values after execution
