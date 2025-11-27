@@ -419,6 +419,7 @@ TACInstr *tac_emit(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TA
     instr->arg2 = a2;
     instr->line = line;
     instr->inShwContext = 0;
+    instr->resultIsChar = 0;  // ← ADD THIS LINE
     instr->next = NULL;
 
     if (!prog->head) {
