@@ -18,6 +18,7 @@
 #define FUNCT_MFLO      0x12
 
 
+
 /* MIPS64 Instruction Formats */
 typedef enum {
     FORMAT_R,  // Register format
@@ -27,39 +28,292 @@ typedef enum {
 
 static int next_register = 0;
 /* Track which register holds which temp/var value */
+/* Register allocation tracking */
 typedef struct {
-    int tempNum;
-    const char *reg;
-    int isDirty;  // Needs to be written back to memory
-} RegTracker;
+    int tempNum;           
+    int lastUseDistance;   
+    int isDirty;          
+} RegisterState;
 
-static RegTracker regTracker[10];
-static int regTrackerCount = 0;
+#define NUM_WORK_REGS 8 
+static RegisterState regState[NUM_WORK_REGS];
 
-/* Find which register holds a temp, or allocate a new one */
-static const char* get_temp_register(int tempNum) {
-    // Check if temp is already in a register
-    for (int i = 0; i < regTrackerCount; i++) {
-        if (regTracker[i].tempNum == tempNum) {
-            return regTracker[i].reg;
+/* Forward declarations */
+static int get_register_number(const char *reg);
+static uint32_t encode_i_format(int opcode, int rs, int rt, int16_t immediate);
+static uint32_t encode_r_format(int funct, int rs, int rt, int rd, int shamt);
+static int find_temp_in_register(int tempNum);
+
+/* Initialize register state */
+static void init_register_state(void) {
+    for (int i = 0; i < NUM_WORK_REGS; i++) {
+        regState[i].tempNum = -1;
+        regState[i].lastUseDistance = 0;
+        regState[i].isDirty = 0;
+    }
+}
+
+/* Get register name by index */
+static const char* get_reg_name(int idx) {
+    static const char* regNames[] = {"r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9"};
+    if (idx >= 0 && idx < NUM_WORK_REGS) {
+        return regNames[idx];
+    }
+    return "r2"; // fallback
+}
+
+/* Find how many instructions until this temp is used again */
+static int find_next_use_distance(TACInstr *current, int tempNum) {
+    int distance = 0;
+    TACInstr *instr = current->next;
+    
+    while (instr) {
+        distance++;
+        
+        // Check if temp is used as operand
+        if ((instr->arg1.type == OPERAND_TEMP && instr->arg1.val.tempNum == tempNum) ||
+            (instr->arg2.type == OPERAND_TEMP && instr->arg2.val.tempNum == tempNum)) {
+            return distance;
+        }
+        
+        // If temp is overwritten, it's not used again
+        if (instr->result.type == OPERAND_TEMP && instr->result.val.tempNum == tempNum) {
+            return 9999; // Never used
+        }
+        
+        instr = instr->next;
+    }
+    
+    return 9999; // Not used again
+}
+
+static int temp_is_used_later(TACInstr *current, int tempNum) {
+    TACInstr *instr = current->next;
+    
+    while (instr) {
+        if ((instr->arg1.type == OPERAND_TEMP && instr->arg1.val.tempNum == tempNum) ||
+            (instr->arg2.type == OPERAND_TEMP && instr->arg2.val.tempNum == tempNum)) {
+            return 1;
+        }
+        
+        // If temp is overwritten, stop looking
+        if (instr->result.type == OPERAND_TEMP && instr->result.val.tempNum == tempNum) {
+            return 0;
+        }
+        
+        instr = instr->next;
+    }
+    
+    return 0;
+}
+
+/* Find best register to evict (using LRU - Least Recently Used / Furthest Next Use) */
+static int find_register_to_evict(TACInstr *current) {
+    int bestReg = 0;
+    int maxDistance = regState[0].lastUseDistance;
+    
+    for (int i = 1; i < NUM_WORK_REGS; i++) {
+        if (regState[i].tempNum == -1) {
+            return i; // Empty register, use it
+        }
+        
+        if (regState[i].lastUseDistance > maxDistance) {
+            maxDistance = regState[i].lastUseDistance;
+            bestReg = i;
         }
     }
     
-    // Allocate a new register (simple round-robin for now)
-    const char *regs[] = {"r2", "r3", "r4", "r5", "r6", "r7", "r8", "r9", "r10", "r11"};
-    int idx = regTrackerCount % 10;
-    
-    // If we're reusing a register, we might need to spill the old value
-    // (skipping spilling logic for simplicity - in practice you'd save dirty values)
-    
-    regTracker[idx].tempNum = tempNum;
-    regTracker[idx].reg = regs[idx];
-    regTracker[idx].isDirty = 0;
-    
-    if (regTrackerCount < 10) regTrackerCount++;
-    
-    return regs[idx];
+    return bestReg;
 }
+
+static void spill_register(int regIdx, char *output, char *hex_out, char *bin_out, int tempStorageOffset) {
+    if (regState[regIdx].tempNum == -1 || !regState[regIdx].isDirty) {
+        return; // Nothing to spill
+    }
+    
+    int tempNum = regState[regIdx].tempNum;
+    int offset = tempStorageOffset + (tempNum * 8);
+    const char *regName = get_reg_name(regIdx);
+    
+    char line[256];
+    snprintf(line, sizeof(line), "sd %s, %d(r0)\n", regName, offset);
+    strcat(output, line);
+    
+    // Generate machine code
+    int rt = get_register_number(regName);
+    uint32_t machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)offset);
+    
+    char hex_str[32];
+    sprintf(hex_str, "0x%08X\n", machine_code);
+    strcat(hex_out, hex_str);
+    
+    char bin_str[40];
+    for (int i = 31; i >= 0; i--) {
+        sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
+    }
+    strcat(bin_out, bin_str);
+    strcat(bin_out, "\n");
+    
+    regState[regIdx].isDirty = 0;
+}
+
+/* Allocate register for a temp */
+static int allocate_register_for_temp(TACInstr *current, int tempNum, 
+                                      char *output, char *hex_out, char *bin_out, 
+                                      int tempStorageOffset) {
+    // Check if already in a register
+    int regIdx = find_temp_in_register(tempNum);
+    if (regIdx != -1) {
+        return regIdx;
+    }
+    
+    // Find a register to use
+    regIdx = find_register_to_evict(current);
+    
+    // Spill current contents if needed
+    spill_register(regIdx, output, hex_out, bin_out, tempStorageOffset);
+    
+    // Allocate to this temp
+    regState[regIdx].tempNum = tempNum;
+    regState[regIdx].lastUseDistance = find_next_use_distance(current, tempNum);
+    regState[regIdx].isDirty = 0;
+    
+    return regIdx;
+}
+/* Load operand into register, with optional exclusion list */
+static int load_operand_ex(TACOperand op, TACInstr *current,
+                       char *output, char *hex_out, char *bin_out,
+                       int tempStorageOffset, int excludeReg) {
+    
+    if (op.type == OPERAND_TEMP) {
+        // Check if already in register
+        int regIdx = find_temp_in_register(op.val.tempNum);
+        if (regIdx != -1) {
+            return regIdx; // Already loaded
+        }
+        
+        // Allocate register and load from memory
+        // First try to find an empty register that's not the excluded one
+        regIdx = -1;
+        for (int i = 0; i < NUM_WORK_REGS; i++) {
+            if (i != excludeReg && regState[i].tempNum == -1) {
+                regIdx = i;
+                break;
+            }
+        }
+        
+        // If no empty register, find one to evict (but not the excluded one)
+        if (regIdx == -1) {
+            int bestReg = -1;
+            int maxDistance = -1;
+            
+            for (int i = 0; i < NUM_WORK_REGS; i++) {
+                if (i == excludeReg) continue;
+                
+                if (bestReg == -1 || regState[i].lastUseDistance > maxDistance) {
+                    maxDistance = regState[i].lastUseDistance;
+                    bestReg = i;
+                }
+            }
+            regIdx = bestReg;
+        }
+        
+        if (regIdx == -1) regIdx = 0; // Fallback (shouldn't happen)
+        
+        spill_register(regIdx, output, hex_out, bin_out, tempStorageOffset);
+        
+        int offset = tempStorageOffset + (op.val.tempNum * 8);
+        const char *regName = get_reg_name(regIdx);
+        
+        char line[256];
+        snprintf(line, sizeof(line), "ld %s, %d(r0)\n", regName, offset);
+        strcat(output, line);
+        
+        int rt = get_register_number(regName);
+        uint32_t machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
+        
+        char hex_str[32];
+        sprintf(hex_str, "0x%08X\n", machine_code);
+        strcat(hex_out, hex_str);
+        
+        char bin_str[40];
+        for (int i = 31; i >= 0; i--) {
+            sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
+        }
+        strcat(bin_out, bin_str);
+        strcat(bin_out, "\n");
+        
+        regState[regIdx].tempNum = op.val.tempNum;
+        regState[regIdx].lastUseDistance = find_next_use_distance(current, op.val.tempNum);
+        regState[regIdx].isDirty = 0;
+        
+        return regIdx;
+        
+    } else if (op.type == OPERAND_VAR) {
+        // Variables always loaded from their memory location
+        // Find a register that's not the excluded one
+        int regIdx = -1;
+        for (int i = 0; i < NUM_WORK_REGS; i++) {
+            if (i != excludeReg) {
+                regIdx = i;
+                break;
+            }
+        }
+        
+        if (regIdx == -1) regIdx = 0; // Fallback
+        
+        spill_register(regIdx, output, hex_out, bin_out, tempStorageOffset);
+        
+        Symbol *s = lookup(op.val.varName);
+        if (!s) return regIdx;
+        
+        const char *regName = get_reg_name(regIdx);
+        
+        char line[256];
+        snprintf(line, sizeof(line), "ld %s, %d(r0)\n", regName, s->memOffset);
+        strcat(output, line);
+        
+        int rt = get_register_number(regName);
+        uint32_t machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)s->memOffset);
+        
+        char hex_str[32];
+        sprintf(hex_str, "0x%08X\n", machine_code);
+        strcat(hex_out, hex_str);
+        
+        char bin_str[40];
+        for (int i = 31; i >= 0; i--) {
+            sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
+        }
+        strcat(bin_out, bin_str);
+        strcat(bin_out, "\n");
+        
+        regState[regIdx].tempNum = -1; // Not tracking this
+        regState[regIdx].isDirty = 0;
+        
+        return regIdx;
+    }
+    
+    return 0;
+}
+
+
+/* Load operand into register */
+static int load_operand(TACOperand op, TACInstr *current,
+                       char *output, char *hex_out, char *bin_out,
+                       int tempStorageOffset) {
+    return load_operand_ex(op, current, output, hex_out, bin_out, tempStorageOffset, -1);
+}
+
+/* Find register holding a temp, or -1 if not in register */
+static int find_temp_in_register(int tempNum) {
+    for (int i = 0; i < NUM_WORK_REGS; i++) {
+        if (regState[i].tempNum == tempNum) {
+            return i;
+        }
+    }
+    return -1;
+}
+
 
 static TACInstr *tac_emit_shw(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TACOperand a2, int line) {
     TACInstr *instr = tac_emit(prog, op, res, a1, a2, line);
@@ -105,16 +359,13 @@ static int temp_needs_memory(TACProgram *prog, TACInstr *current, int tempNum) {
                     return 0;  // Don't need memory - single use within register window
                 }
             }
-            
             // If used multiple times or far away, needs memory
             return 1;
         }
-        
         // Don't look too far ahead for register-only temps
         if (instructionsAhead > 10) {
             break;
         }
-        
         check = check->next;
     }
     
@@ -393,7 +644,7 @@ static void optimize_arithmetic_assignments(TACProgram *prog) {
         
         // Pattern: Arithmetic op into temp, immediately COPY temp to var
         if ((curr->op == TAC_ADD || curr->op == TAC_SUB || 
-             curr->op == TAC_MUL || curr->op == TAC_DIV) &&
+            curr->op == TAC_MUL || curr->op == TAC_DIV) &&
             curr->result.type == OPERAND_TEMP &&
             next->op == TAC_COPY &&
             next->arg1.type == OPERAND_TEMP &&
@@ -451,6 +702,10 @@ static void print_operand_value(TACOperand op, int *tempValues, TACProgram *prog
             } else {
                 printf("%d", op.val.intVal);
             }
+            break;
+        
+        case OPERAND_STR:  
+            printf("%s", op.val.strVal);
             break;
             
         case OPERAND_TEMP: {
@@ -783,590 +1038,323 @@ static void print_hex(FILE *fp, uint32_t value) {
 /* Optimize consecutive LOAD_INT -> COPY sequences */
 
 /* Generate EduMIPS64 assembly and binary code */
+/* Improved assembly generation with register allocation */
 void tac_generate_assembly(TACProgram *prog) {
-    /* Buffers to store output */
     char assembly_output[99999] = "";
     char hex_output[99999] = "";
     char binary_output[99999] = "";
     
-    /* Add assembly header */
     strcat(assembly_output, ".data\n\n.code\n\n");
     
-    /* Calculate temp storage offset (after all variables) */
-    int tempStorageOffset = 1000;  // Start temps at offset 1000
+    int tempStorageOffset = 1000;
     
-    /* Generate code for each TAC instruction */
+    init_register_state();
+    
     for (TACInstr *instr = prog->head; instr; instr = instr->next) {
-        //not generate code for shw-only instructions
         if (instr->inShwContext) {
             continue;
         }
+        
         char asm_line[256] = "";
-        uint32_t machine_code = 0;
-        int has_machine_code = 1;
         
         switch (instr->op) {
             case TAC_LOAD_INT: {
-                int value = instr->arg1.val.intVal;
-                const char *tempReg = "r2";  // Changed from $t0
-                char hex_str[32];
-                char bin_str[40];
-                
-                // Load immediate value into register
-                snprintf(asm_line, sizeof(asm_line), "daddiu %s, r0, %d\n", tempReg, value);
-                strcat(assembly_output, asm_line);
-                
-                int rt = get_register_number(tempReg);
-                machine_code = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)value);
-                
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                // Determine destination offset
-                int destOffset;
                 if (instr->result.type == OPERAND_VAR) {
-                    destOffset = get_memory_offset(instr->result);
+                    // Load directly to variable in memory
+                    Symbol *s = lookup(instr->result.val.varName);
+                    if (s) {
+                        snprintf(asm_line, sizeof(asm_line), "daddiu r2, r0, %d\n", instr->arg1.val.intVal);
+                        strcat(assembly_output, asm_line);
+                        
+                        uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, 2, (int16_t)instr->arg1.val.intVal);
+                        char hex_str[32];
+                        sprintf(hex_str, "0x%08X\n", mc);
+                        strcat(hex_output, hex_str);
+                        
+                        char bin_str[40];
+                        for (int i = 31; i >= 0; i--) {
+                            sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                        }
+                        strcat(binary_output, bin_str);
+                        strcat(binary_output, "\n");
+                        
+                        snprintf(asm_line, sizeof(asm_line), "sd r2, %d(r0)\n", s->memOffset);
+                        strcat(assembly_output, asm_line);
+                        
+                        mc = encode_i_format(OPCODE_SD, 0, 2, (int16_t)s->memOffset);
+                        sprintf(hex_str, "0x%08X\n", mc);
+                        strcat(hex_output, hex_str);
+                        
+                        for (int i = 31; i >= 0; i--) {
+                            sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                        }
+                        strcat(binary_output, bin_str);
+                        strcat(binary_output, "\n");
+                    }
                 } else if (instr->result.type == OPERAND_TEMP) {
-                    destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
+                    // Load immediate into register
+                    int regIdx = allocate_register_for_temp(instr, instr->result.val.tempNum, 
+                                                           assembly_output, hex_output, binary_output, 
+                                                           tempStorageOffset);
+                    const char *regName = get_reg_name(regIdx);
+                    
+                    snprintf(asm_line, sizeof(asm_line), "daddiu %s, r0, %d\n", regName, instr->arg1.val.intVal);
+                    strcat(assembly_output, asm_line);
+                    
+                    int rt = get_register_number(regName);
+                    uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)instr->arg1.val.intVal);
+                    
+                    char hex_str[32];
+                    sprintf(hex_str, "0x%08X\n", mc);
+                    strcat(hex_output, hex_str);
+                    
+                    char bin_str[40];
+                    for (int i = 31; i >= 0; i--) {
+                        sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                    }
+                    strcat(binary_output, bin_str);
+                    strcat(binary_output, "\n");
+                    
+                    regState[regIdx].isDirty = 1;
+                    
+                    // Only store if this temp is used later or if it's the last instruction
+                    if (!temp_is_used_later(instr, instr->result.val.tempNum) || !instr->next) {
+                        // Will be stored at end if needed
+                    }
                 }
-                
-                // Always store to memory for consistency
-                snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", tempReg, destOffset);
-                strcat(assembly_output, asm_line);
-                
-                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
                 break;
             }
             
-            case TAC_ADD: {
-                char hex_str[32];
-                char bin_str[40];
-                
-                // Load left operand into r2
-                const char *leftReg = "r2";
-                int leftOffset;
-                if (instr->arg1.type == OPERAND_VAR) {
-                    leftOffset = get_memory_offset(instr->arg1);
-                } else if (instr->arg1.type == OPERAND_TEMP) {
-                    leftOffset = tempStorageOffset + (instr->arg1.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", leftReg, leftOffset);
-                strcat(assembly_output, asm_line);
-                int rt_left = get_register_number(leftReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_left, (int16_t)leftOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                // Load right operand into r3
-                const char *rightReg = "r3";
-                int rightOffset;
-                if (instr->arg2.type == OPERAND_VAR) {
-                    rightOffset = get_memory_offset(instr->arg2);
-                } else if (instr->arg2.type == OPERAND_TEMP) {
-                    rightOffset = tempStorageOffset + (instr->arg2.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", rightReg, rightOffset);
-                strcat(assembly_output, asm_line);
-                int rt_right = get_register_number(rightReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_right, (int16_t)rightOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                // Perform addition into r4
-                const char *destReg = "r4";
-                snprintf(asm_line, sizeof(asm_line), "daddu %s, %s, %s\n", destReg, leftReg, rightReg);
-                strcat(assembly_output, asm_line);
-                
-                int rd = get_register_number(destReg);
-                int rs = get_register_number(leftReg);
-                int rt = get_register_number(rightReg);
-                machine_code = encode_r_format(FUNCT_DADDU, rs, rt, rd, 0);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                // Store result
-                int destOffset;
-                if (instr->result.type == OPERAND_VAR) {
-                    destOffset = get_memory_offset(instr->result);
-                } else if (instr->result.type == OPERAND_TEMP) {
-                    destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", destReg, destOffset);
-                strcat(assembly_output, asm_line);
-                
-                rt = get_register_number(destReg);
-                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                break;
-            }
-            
-            case TAC_SUB: {
-                // Same pattern as ADD but with dsubu - use r2, r3, r4
-                char hex_str[32];
-                char bin_str[40];
-                
-                const char *leftReg = "r2";
-                int leftOffset;
-                if (instr->arg1.type == OPERAND_VAR) {
-                    leftOffset = get_memory_offset(instr->arg1);
-                } else if (instr->arg1.type == OPERAND_TEMP) {
-                    leftOffset = tempStorageOffset + (instr->arg1.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", leftReg, leftOffset);
-                strcat(assembly_output, asm_line);
-                int rt_left = get_register_number(leftReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_left, (int16_t)leftOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                const char *rightReg = "r3";
-                int rightOffset;
-                if (instr->arg2.type == OPERAND_VAR) {
-                    rightOffset = get_memory_offset(instr->arg2);
-                } else if (instr->arg2.type == OPERAND_TEMP) {
-                    rightOffset = tempStorageOffset + (instr->arg2.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", rightReg, rightOffset);
-                strcat(assembly_output, asm_line);
-                int rt_right = get_register_number(rightReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_right, (int16_t)rightOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                const char *destReg = "r4";
-                snprintf(asm_line, sizeof(asm_line), "dsubu %s, %s, %s\n", destReg, leftReg, rightReg);
-                strcat(assembly_output, asm_line);
-                
-                int rd = get_register_number(destReg);
-                int rs = get_register_number(leftReg);
-                int rt = get_register_number(rightReg);
-                machine_code = encode_r_format(FUNCT_DSUBU, rs, rt, rd, 0);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                int destOffset;
-                if (instr->result.type == OPERAND_VAR) {
-                    destOffset = get_memory_offset(instr->result);
-                } else if (instr->result.type == OPERAND_TEMP) {
-                    destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", destReg, destOffset);
-                strcat(assembly_output, asm_line);
-                
-                rt = get_register_number(destReg);
-                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                break;
-            }
-            
-            case TAC_MUL: {
-                // Use r2, r3 for operands, r4 for result (same as ADD/SUB)
-                char hex_str[32];
-                char bin_str[40];
-                
-                const char *leftReg = "r2";
-                int leftOffset;
-                if (instr->arg1.type == OPERAND_VAR) {
-                    leftOffset = get_memory_offset(instr->arg1);
-                } else if (instr->arg1.type == OPERAND_TEMP) {
-                    leftOffset = tempStorageOffset + (instr->arg1.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", leftReg, leftOffset);
-                strcat(assembly_output, asm_line);
-                int rt_left = get_register_number(leftReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_left, (int16_t)leftOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                const char *rightReg = "r3";
-                int rightOffset;
-                if (instr->arg2.type == OPERAND_VAR) {
-                    rightOffset = get_memory_offset(instr->arg2);
-                } else if (instr->arg2.type == OPERAND_TEMP) {
-                    rightOffset = tempStorageOffset + (instr->arg2.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", rightReg, rightOffset);
-                strcat(assembly_output, asm_line);
-                int rt_right = get_register_number(rightReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_right, (int16_t)rightOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                snprintf(asm_line, sizeof(asm_line), "dmult %s, %s\n", leftReg, rightReg);
-                strcat(assembly_output, asm_line);
-                
-                int rs = get_register_number(leftReg);
-                int rt = get_register_number(rightReg);
-                machine_code = encode_r_format(FUNCT_DMULT, rs, rt, 0, 0);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                const char *destReg = "r4";
-                snprintf(asm_line, sizeof(asm_line), "mflo %s\n", destReg);
-                strcat(assembly_output, asm_line);
-                
-                int rd = get_register_number(destReg);
-                machine_code = encode_r_format(FUNCT_MFLO, 0, 0, rd, 0);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                int destOffset;
-                if (instr->result.type == OPERAND_VAR) {
-                    destOffset = get_memory_offset(instr->result);
-                } else if (instr->result.type == OPERAND_TEMP) {
-                    destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", destReg, destOffset);
-                strcat(assembly_output, asm_line);
-                
-                rt = get_register_number(destReg);
-                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                break;
-            }
-            
+            case TAC_ADD:
+            case TAC_SUB:
+            case TAC_MUL:
             case TAC_DIV: {
-                // Same register pattern as MUL
+                // Load left operand into register
+                int leftReg = load_operand(instr->arg1, instr, assembly_output, hex_output, binary_output, tempStorageOffset);
+                
+                // Mark left register as "in use" temporarily to prevent it from being evicted
+                int savedLeftTemp = regState[leftReg].tempNum;
+                int savedLeftDirty = regState[leftReg].isDirty;
+                
+                // Load right operand (this won't evict leftReg now)
+                int rightReg = load_operand_ex(instr->arg2, instr, assembly_output, hex_output, binary_output, tempStorageOffset, leftReg);
+                
+                // If both operands ended up in the same register (shouldn't happen but just in case)
+                if (leftReg == rightReg && instr->arg1.type != instr->arg2.type) {
+                    // Move one to a different register
+                    int newRightReg = find_register_to_evict(instr);
+                    if (newRightReg == leftReg) {
+                        // Find another register
+                        for (int i = 0; i < NUM_WORK_REGS; i++) {
+                            if (i != leftReg) {
+                                newRightReg = i;
+                                break;
+                            }
+                        }
+                    }
+                    spill_register(newRightReg, assembly_output, hex_output, binary_output, tempStorageOffset);
+                    
+                    const char *srcRegName = get_reg_name(rightReg);
+                    const char *destRegName = get_reg_name(newRightReg);
+                    
+                    char move_line[256];
+                    snprintf(move_line, sizeof(move_line), "daddu %s, %s, r0  ; move to avoid conflict\n", destRegName, srcRegName);
+                    strcat(assembly_output, move_line);
+                    
+                    int rs = get_register_number(srcRegName);
+                    int rd = get_register_number(destRegName);
+                    uint32_t mc = encode_r_format(FUNCT_DADDU, rs, 0, rd, 0);
+                    
+                    char hex_str[32];
+                    sprintf(hex_str, "0x%08X\n", mc);
+                    strcat(hex_output, hex_str);
+                    
+                    char bin_str[40];
+                    for (int i = 31; i >= 0; i--) {
+                        sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                    }
+                    strcat(binary_output, bin_str);
+                    strcat(binary_output, "\n");
+                    
+                    rightReg = newRightReg;
+                }
+                
+                // Allocate destination register
+                int destReg;
+                if (instr->result.type == OPERAND_TEMP) {
+                    destReg = allocate_register_for_temp(instr, instr->result.val.tempNum,
+                                                        assembly_output, hex_output, binary_output,
+                                                        tempStorageOffset);
+                } else {
+                    destReg = find_register_to_evict(instr);
+                    // Make sure we don't evict our source operands
+                    if (destReg == leftReg || destReg == rightReg) {
+                        for (int i = 0; i < NUM_WORK_REGS; i++) {
+                            if (i != leftReg && i != rightReg) {
+                                destReg = i;
+                                break;
+                            }
+                        }
+                    }
+                    spill_register(destReg, assembly_output, hex_output, binary_output, tempStorageOffset);
+                }
+                
+                const char *leftRegName = get_reg_name(leftReg);
+                const char *rightRegName = get_reg_name(rightReg);
+                const char *destRegName = get_reg_name(destReg);
+                
+                // Perform operation
+                const char *opName;
+                int funct;
+                int needsMflo = 0;
+                
+                switch (instr->op) {
+                    case TAC_ADD: opName = "daddu"; funct = FUNCT_DADDU; break;
+                    case TAC_SUB: opName = "dsubu"; funct = FUNCT_DSUBU; break;
+                    case TAC_MUL: opName = "dmult"; funct = FUNCT_DMULT; needsMflo = 1; break;
+                    case TAC_DIV: opName = "ddiv"; funct = FUNCT_DDIV; needsMflo = 1; break;
+                    default: opName = "daddu"; funct = FUNCT_DADDU;
+                }
+                
+                if (needsMflo) {
+                    snprintf(asm_line, sizeof(asm_line), "%s %s, %s\n", opName, leftRegName, rightRegName);
+                } else {
+                    snprintf(asm_line, sizeof(asm_line), "%s %s, %s, %s\n", opName, destRegName, leftRegName, rightRegName);
+                }
+                strcat(assembly_output, asm_line);
+                
+                int rs = get_register_number(leftRegName);
+                int rt = get_register_number(rightRegName);
+                int rd = get_register_number(destRegName);
+                uint32_t mc;
+                
+                if (needsMflo) {
+                    mc = encode_r_format(funct, rs, rt, 0, 0);
+                } else {
+                    mc = encode_r_format(funct, rs, rt, rd, 0);
+                }
+                
                 char hex_str[32];
+                sprintf(hex_str, "0x%08X\n", mc);
+                strcat(hex_output, hex_str);
+                
                 char bin_str[40];
-                
-                const char *leftReg = "r2";
-                int leftOffset;
-                if (instr->arg1.type == OPERAND_VAR) {
-                    leftOffset = get_memory_offset(instr->arg1);
-                } else if (instr->arg1.type == OPERAND_TEMP) {
-                    leftOffset = tempStorageOffset + (instr->arg1.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
-                }
-                
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", leftReg, leftOffset);
-                strcat(assembly_output, asm_line);
-                int rt_left = get_register_number(leftReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_left, (int16_t)leftOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
                 for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
+                    sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
                 }
                 strcat(binary_output, bin_str);
                 strcat(binary_output, "\n");
                 
-                const char *rightReg = "r3";
-                int rightOffset;
-                if (instr->arg2.type == OPERAND_VAR) {
-                    rightOffset = get_memory_offset(instr->arg2);
-                } else if (instr->arg2.type == OPERAND_TEMP) {
-                    rightOffset = tempStorageOffset + (instr->arg2.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
+                if (needsMflo) {
+                    snprintf(asm_line, sizeof(asm_line), "mflo %s\n", destRegName);
+                    strcat(assembly_output, asm_line);
+                    
+                    mc = encode_r_format(FUNCT_MFLO, 0, 0, rd, 0);
+                    sprintf(hex_str, "0x%08X\n", mc);
+                    strcat(hex_output, hex_str);
+                    
+                    for (int i = 31; i >= 0; i--) {
+                        sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                    }
+                    strcat(binary_output, bin_str);
+                    strcat(binary_output, "\n");
                 }
                 
-                snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", rightReg, rightOffset);
-                strcat(assembly_output, asm_line);
-                int rt_right = get_register_number(rightReg);
-                machine_code = encode_i_format(OPCODE_LD, 0, rt_right, (int16_t)rightOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
+                // Mark result as dirty
+                regState[destReg].isDirty = 1;
                 
-                snprintf(asm_line, sizeof(asm_line), "ddiv %s, %s\n", leftReg, rightReg);
-                strcat(assembly_output, asm_line);
-                
-                int rs = get_register_number(leftReg);
-                int rt = get_register_number(rightReg);
-                machine_code = encode_r_format(FUNCT_DDIV, rs, rt, 0, 0);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                const char *destReg = "r4";
-                snprintf(asm_line, sizeof(asm_line), "mflo %s\n", destReg);
-                strcat(assembly_output, asm_line);
-                
-                int rd = get_register_number(destReg);
-                machine_code = encode_r_format(FUNCT_MFLO, 0, 0, rd, 0);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
-                
-                int destOffset;
+                // ALWAYS store result if it's a variable
                 if (instr->result.type == OPERAND_VAR) {
-                    destOffset = get_memory_offset(instr->result);
-                } else if (instr->result.type == OPERAND_TEMP) {
-                    destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                } else {
-                    has_machine_code = 0;
-                    break;
+                    Symbol *s = lookup(instr->result.val.varName);
+                    if (s) {
+                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", destRegName, s->memOffset);
+                        strcat(assembly_output, asm_line);
+                        
+                        mc = encode_i_format(OPCODE_SD, 0, rd, (int16_t)s->memOffset);
+                        sprintf(hex_str, "0x%08X\n", mc);
+                        strcat(hex_output, hex_str);
+                        
+                        for (int i = 31; i >= 0; i--) {
+                            sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                        }
+                        strcat(binary_output, bin_str);
+                        strcat(binary_output, "\n");
+                        
+                        regState[destReg].isDirty = 0; // No longer dirty after storing
+                    }
                 }
-                
-                snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", destReg, destOffset);
-                strcat(assembly_output, asm_line);
-                
-                rt = get_register_number(destReg);
-                machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                sprintf(hex_str, "0x%08X\n", machine_code);
-                strcat(hex_output, hex_str);
-                for (int i = 31; i >= 0; i--) {
-                    sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                }
-                strcat(binary_output, bin_str);
-                strcat(binary_output, "\n");
                 
                 break;
             }
             
             case TAC_COPY: {
-                const char *tempReg = "r2";  // Changed from $t0
+                // Similar pattern - load source, store to destination
+                int srcReg = load_operand(instr->arg1, instr, assembly_output, hex_output, binary_output, tempStorageOffset);
                 
-                if (instr->arg1.type == OPERAND_INT) {
-                    int value = instr->arg1.val.intVal;
-                    int destOffset;
+                if (instr->result.type == OPERAND_VAR) {
+                    Symbol *s = lookup(instr->result.val.varName);
+                    if (s) {
+                        const char *regName = get_reg_name(srcReg);
+                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", regName, s->memOffset);
+                        strcat(assembly_output, asm_line);
+                        
+                        int rt = get_register_number(regName);
+                        uint32_t mc = encode_i_format(OPCODE_SD, 0, rt, (int16_t)s->memOffset);
+                        
+                        char hex_str[32];
+                        sprintf(hex_str, "0x%08X\n", mc);
+                        strcat(hex_output, hex_str);
+                        
+                        char bin_str[40];
+                        for (int i = 31; i >= 0; i--) {
+                            sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                        }
+                        strcat(binary_output, bin_str);
+                        strcat(binary_output, "\n");
+                    }
+                } else if (instr->result.type == OPERAND_TEMP) {
+                    int destReg = allocate_register_for_temp(instr, instr->result.val.tempNum,
+                                                            assembly_output, hex_output, binary_output,
+                                                            tempStorageOffset);
                     
-                    if (instr->result.type == OPERAND_VAR) {
-                        destOffset = get_memory_offset(instr->result);
-                    } else if (instr->result.type == OPERAND_TEMP) {
-                        destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                    } else {
-                        has_machine_code = 0;
-                        break;
+                    if (srcReg != destReg) {
+                        const char *srcRegName = get_reg_name(srcReg);
+                        const char *destRegName = get_reg_name(destReg);
+                        
+                        snprintf(asm_line, sizeof(asm_line), "daddu %s, %s, r0\n", destRegName, srcRegName);
+                        strcat(assembly_output, asm_line);
+                        
+                        int rs = get_register_number(srcRegName);
+                        int rd = get_register_number(destRegName);
+                        uint32_t mc = encode_r_format(FUNCT_DADDU, rs, 0, rd, 0);
+                        
+                        char hex_str[32];
+                        sprintf(hex_str, "0x%08X\n", mc);
+                        strcat(hex_output, hex_str);
+                        
+                        char bin_str[40];
+                        for (int i = 31; i >= 0; i--) {
+                            sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                        }
+                        strcat(binary_output, bin_str);
+                        strcat(binary_output, "\n");
                     }
                     
-                    // Load immediate
-                    snprintf(asm_line, sizeof(asm_line), "daddiu %s, r0, %d\n", tempReg, value);
-                    strcat(assembly_output, asm_line);
-                    
-                    int rt = get_register_number(tempReg);
-                    machine_code = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)value);
-                    
-                    char hex_str[32];
-                    sprintf(hex_str, "0x%08X\n", machine_code);
-                    strcat(hex_output, hex_str);
-                    
-                    char bin_str[40];
-                    for (int i = 31; i >= 0; i--) {
-                        sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                    }
-                    strcat(binary_output, bin_str);
-                    strcat(binary_output, "\n");
-                    
-                    // Store to destination
-                    snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", tempReg, destOffset);
-                    strcat(assembly_output, asm_line);
-                    
-                    machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                    
-                    sprintf(hex_str, "0x%08X\n", machine_code);
-                    strcat(hex_output, hex_str);
-                    
-                    for (int i = 31; i >= 0; i--) {
-                        sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                    }
-                    strcat(binary_output, bin_str);
-                    strcat(binary_output, "\n");
-                    
-                } else if (instr->arg1.type == OPERAND_VAR || instr->arg1.type == OPERAND_TEMP) {
-                    // Load from source using r2
-                    int srcOffset;
-                    if (instr->arg1.type == OPERAND_VAR) {
-                        srcOffset = get_memory_offset(instr->arg1);
-                    } else {
-                        srcOffset = tempStorageOffset + (instr->arg1.val.tempNum * 8);
-                    }
-                    
-                    snprintf(asm_line, sizeof(asm_line), "ld %s, %d(r0)\n", tempReg, srcOffset);
-                    strcat(assembly_output, asm_line);
-                    
-                    int rt = get_register_number(tempReg);
-                    machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)srcOffset);
-                    
-                    char hex_str[32];
-                    sprintf(hex_str, "0x%08X\n", machine_code);
-                    strcat(hex_output, hex_str);
-                    
-                    char bin_str[40];
-                    for (int i = 31; i >= 0; i--) {
-                        sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                    }
-                    strcat(binary_output, bin_str);
-                    strcat(binary_output, "\n");
-                    
-                    // Store to destination
-                    int destOffset;
-                    if (instr->result.type == OPERAND_VAR) {
-                        destOffset = get_memory_offset(instr->result);
-                    } else if (instr->result.type == OPERAND_TEMP) {
-                        destOffset = tempStorageOffset + (instr->result.val.tempNum * 8);
-                    } else {
-                        has_machine_code = 0;
-                        break;
-                    }
-                    
-                    snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", tempReg, destOffset);
-                    strcat(assembly_output, asm_line);
-                    
-                    machine_code = encode_i_format(OPCODE_SD, 0, rt, (int16_t)destOffset);
-                    
-                    sprintf(hex_str, "0x%08X\n", machine_code);
-                    strcat(hex_output, hex_str);
-                    
-                    for (int i = 31; i >= 0; i--) {
-                        sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-                    }
-                    strcat(binary_output, bin_str);
-                    strcat(binary_output, "\n");
-                } else {
-                    has_machine_code = 0;
+                    regState[destReg].isDirty = 1;
                 }
                 break;
             }
+            
             default:
-                has_machine_code = 0;
                 break;
         }
     }
     
-    // Print all outputs to console
+    // Spill any remaining dirty registers at the end
+    for (int i = 0; i < NUM_WORK_REGS; i++) {
+        spill_register(i, assembly_output, hex_output, binary_output, tempStorageOffset);
+    }
+    
     printf("assembly:\n\"%s\",", assembly_output);
     printf("\nbinary:\n\"%s\",", binary_output);
     printf("\nhex:\n\"%s\"", hex_output);
