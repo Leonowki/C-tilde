@@ -436,12 +436,7 @@ int main(int argc, char **argv) {
             print_symbol_table();
         }
         
-    
-        tac_generate_assembly(tac, "output.s");
-
-        if(DEBUG_MODE) {
-            printf("\n=== Assembly Code Generated: output.s ===\n");
-        }
+        tac_generate_assembly(tac);
 
         tac_free(tac);
         ast_free(root);
