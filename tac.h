@@ -36,6 +36,7 @@ typedef struct {
         int intVal;
         char *strVal;
     } val;
+    int isCharType;
 } TACOperand;
 
 /* TAC Instruction */
@@ -46,6 +47,7 @@ typedef struct TACInstr {
     TACOperand arg2;
     int line;
     int inShwContext; 
+    int resultIsChar;
     struct TACInstr *next;
 } TACInstr;
 

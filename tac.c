@@ -184,19 +184,10 @@ TACOperand tac_gen_expr_ctx(TACProgram *prog, ASTNode *node, int inShwContext) {
     if (!node) return tac_operand_none();
 
     switch (node->type) {
-        case NODE_NUM_LIT: {
-            int t = tac_new_temp(prog);
-            TACOperand res = tac_operand_temp(t);
-            if (inShwContext) {
-                tac_emit_shw(prog, TAC_LOAD_INT, res, tac_operand_int(node->data.numVal), tac_operand_none(), node->line);
-            } else {
-                tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int(node->data.numVal), tac_operand_none(), node->line);
-            }
-            return res;
-        }
         case NODE_CHR_LIT: {
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
+            res.isCharType = 1;  // Mark as character type
             if (inShwContext) {
                 tac_emit_shw(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
             } else {
@@ -204,24 +195,26 @@ TACOperand tac_gen_expr_ctx(TACProgram *prog, ASTNode *node, int inShwContext) {
             }
             return res;
         }
-        case NODE_STR_LIT: {
-            int t = tac_new_temp(prog);
-            TACOperand res = tac_operand_temp(t);
-            if (inShwContext) {
-                tac_emit_shw(prog, TAC_LOAD_STR, res, tac_operand_str(node->data.strVal), tac_operand_none(), node->line);
-            } else {
-                tac_emit(prog, TAC_LOAD_STR, res, tac_operand_str(node->data.strVal), tac_operand_none(), node->line);
-            }
-            return res;
-        }
+        
         case NODE_IDENT: {
-            return tac_operand_var(node->data.strVal);
+            TACOperand op = tac_operand_var(node->data.strVal);
+            // Check if this variable is a chr type
+            Symbol *s = lookup(node->data.strVal);
+            if (s && s->type == TYPE_CHR) {
+                op.isCharType = 1;
+            }
+            return op;
         }
+        
         case NODE_BINOP: {
             TACOperand left = tac_gen_expr_ctx(prog, node->data.binop.left, inShwContext);
             TACOperand right = tac_gen_expr_ctx(prog, node->data.binop.right, inShwContext);
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
+            
+            // Left associative: result type follows left operand
+            res.isCharType = left.isCharType;
+            
             TACOp op;
             switch (node->data.binop.op) {
                 case OP_ADD: op = TAC_ADD; break;
@@ -230,11 +223,17 @@ TACOperand tac_gen_expr_ctx(TACProgram *prog, ASTNode *node, int inShwContext) {
                 case OP_DIV: op = TAC_DIV; break;
                 default: op = TAC_ADD; break;
             }
+            
+            TACInstr *instr;
             if (inShwContext) {
-                tac_emit_shw(prog, op, res, left, right, node->line);
+                instr = tac_emit_shw(prog, op, res, left, right, node->line);
             } else {
-                tac_emit(prog, op, res, left, right, node->line);
+                instr = tac_emit(prog, op, res, left, right, node->line);
             }
+            
+            // Store type info in the instruction
+            instr->resultIsChar = res.isCharType;
+            
             return res;
         }
         case NODE_CONCAT: {
@@ -428,12 +427,54 @@ TACProgram *tac_generate(ASTNode *ast) {
     return prog;
 }
 
-static void print_operand(TACOperand op) {
+//handles printing with char type support
+static void print_operand_value(TACOperand op, int *tempValues, TACProgram *prog, int isCharContext) {
     switch (op.type) {
-        case OPERAND_NONE: break;
-        case OPERAND_TEMP: printf("t%d", op.val.tempNum); break;
-        case OPERAND_VAR:  printf("%s", op.val.varName); break;
-        case OPERAND_INT:  printf("%d", op.val.intVal); break;
+        case OPERAND_INT:
+            if (isCharContext) {
+                printf("%c", op.val.intVal);
+            } else {
+                printf("%d", op.val.intVal);
+            }
+            break;
+            
+        case OPERAND_TEMP: {
+            int value = tempValues[op.val.tempNum];
+            
+            // Find the instruction that produced this temp to check its type
+            TACInstr *instr = prog->head;
+            int shouldPrintAsChar = 0;
+            
+            while (instr) {
+                if (instr->result.type == OPERAND_TEMP && 
+                    instr->result.val.tempNum == op.val.tempNum) {
+                    shouldPrintAsChar = instr->resultIsChar;
+                    break;
+                }
+                instr = instr->next;
+            }
+            
+            if (shouldPrintAsChar) {
+                printf("%c", value);
+            } else {
+                printf("%d", value);
+            }
+            break;
+        }
+            
+        case OPERAND_VAR: {
+            Symbol *s = lookup(op.val.varName);
+            if (s) {
+                if (s->type == TYPE_CHR || (s->type == TYPE_FLEX && s->flexType == FLEX_CHAR)) {
+                    printf("%c", s->chrVal);
+                } else {
+                    printf("%d", s->numVal);
+                }
+            }
+            break;
+        }
+        default:
+            break;
     }
 }
 
@@ -450,6 +491,15 @@ const char *tac_op_to_string(TACOp op) {
         case TAC_CONCAT:   return "concat";
         case TAC_DECL:     return "decl";
         default:           return "?";
+    }
+}
+static void print_operand(TACOperand op) {
+    switch (op.type) {
+        case OPERAND_NONE: break;
+        case OPERAND_TEMP: printf("t%d", op.val.tempNum); break;
+        case OPERAND_VAR:  printf("%s", op.val.varName); break;
+        case OPERAND_INT:  printf("%d", op.val.intVal); break;
+        case OPERAND_STR:  printf("\"%s\"", op.val.strVal); break;
     }
 }
 
@@ -558,57 +608,6 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
     }
 }
 
-/* Helper function to print an operand value */
-static void print_operand_value(TACOperand op, int *tempValues, TACProgram *prog) {
-    switch (op.type) {
-        case OPERAND_INT:
-            printf("%d", op.val.intVal);
-            break;
-            
-        case OPERAND_STR:
-            printf("%s", op.val.strVal);
-            break;
-            
-        case OPERAND_TEMP: {
-            // For temps that hold strings, we need to look back at the LOAD_STR instruction
-            // For now, just print the numeric value
-            int value = tempValues[op.val.tempNum];
-            
-            // Check if this temp was loaded from a string
-            // We'll store a pointer to the string instruction
-            TACInstr *instr = prog->head;
-            while (instr) {
-                if (instr->op == TAC_LOAD_STR && 
-                    instr->result.type == OPERAND_TEMP && 
-                    instr->result.val.tempNum == op.val.tempNum) {
-                    // Found the string load instruction
-                    printf("%s", instr->arg1.val.strVal);
-                    return;
-                }
-                instr = instr->next;
-            }
-            
-            // Otherwise print as number
-            printf("%d", value);
-            break;
-        }
-            
-        case OPERAND_VAR: {
-            Symbol *s = lookup(op.val.varName);
-            if (s) {
-                if (s->type == TYPE_CHR || (s->type == TYPE_FLEX && s->flexType == FLEX_CHAR)) {
-                    printf("%c", s->chrVal);
-                } else if (s->type == TYPE_NMBR || (s->type == TYPE_FLEX && s->flexType == FLEX_NUMBER)) {
-                    printf("%d", s->numVal);
-                }
-            }
-            break;
-        }
-            
-        default:
-            break;
-    }
-}
 
 void tac_execute(TACProgram *prog) {
     if (!prog || !prog->head) return;
@@ -675,7 +674,7 @@ void tac_execute(TACProgram *prog) {
             }
 
             case TAC_CONCAT: {
-                print_operand_value(instr->arg1, tempValues, prog);
+                print_operand_value(instr->arg1, tempValues, prog, instr->resultIsChar);
                 break;
             }
 
@@ -1626,7 +1625,6 @@ void tac_generate_assembly(TACProgram *prog, const char *output_file) {
                 }
                 break;
             }
-            
             default:
                 has_machine_code = 0;
                 break;

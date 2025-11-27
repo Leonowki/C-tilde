@@ -13,6 +13,7 @@ extern int yylineno;
 extern char *yytext;
 
 void yyerror(const char *s);
+extern int yychar;
 
 int lineCount = 1;
 ASTNode *root = NULL;
@@ -135,7 +136,7 @@ decl_list:
         ;
 
 decl_item:
-        /* Initialized declarations */
+        /* ===== Initialized declarations ===== */
         TOK_NMBR TOK_IDENTIFIER TOK_ASSIGN expr {
             Symbol *s = insert($2, TYPE_NMBR, lineCount, &error_count);
             if (!s) {
@@ -144,7 +145,6 @@ decl_item:
                 $$ = ast_create_decl(TYPE_NMBR, $2, $4, lineCount);
             }
         }
-        /* FIX: chr accepts expr (which includes char literals via factor rule) */
         | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN expr {
             Symbol *s = insert($2, TYPE_CHR, lineCount, &error_count);
             if (!s) {
@@ -161,7 +161,8 @@ decl_item:
                 $$ = ast_create_decl(TYPE_FLEX, $2, $4, lineCount);
             }
         }
-        /* Uninitialized declarations with default values */
+        
+        /* ===== Uninitialized declarations ===== */
         | TOK_NMBR TOK_IDENTIFIER {
             Symbol *s = insert($2, TYPE_NMBR, lineCount, &error_count);
             if (!s) {
@@ -189,6 +190,68 @@ decl_item:
                 $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
             }
         }
+        
+        /* ===== ERROR HANDLING ===== */
+        
+        /* Error: Missing identifier after type keyword */
+        | TOK_NMBR error {
+            fprintf(stderr, "Expected identifier after 'nmbr', got '%s' ",yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        | TOK_CHR error {
+            fprintf(stderr, "Expected identifier after 'chr', got '%s' ",yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        | TOK_FLEX error {
+            fprintf(stderr, "Expected identifier after 'flex', got '%s' ", yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        
+        /* Error: Wrong token after identifier (expected ':' or newline/comma) */
+        | TOK_NMBR TOK_IDENTIFIER error {
+            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s' ", $2, yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        | TOK_CHR TOK_IDENTIFIER error {
+            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s' ", $2, yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        | TOK_FLEX TOK_IDENTIFIER error {
+            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s' ", $2, yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        
+        /* Error: Missing or invalid expression after ':' */
+        | TOK_NMBR TOK_IDENTIFIER TOK_ASSIGN error {
+            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s' ", $2, yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN error {
+            fprintf(stderr, "Expected expression after 'chr %s =', got '%s' ", $2, yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
+        | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN error {
+            fprintf(stderr,"Expected expression after 'flex %s =', got '%s' ", $2, yytext);
+            error_count++;
+            yyerrok;
+            $$ = NULL;
+        }
         ;
 
 assignment:
@@ -196,7 +259,7 @@ assignment:
             Symbol *s = lookup($1);
             if (!s) {
                     error_count++;
-                    fprintf(stderr, "LINE %d: Undefined variable '%s'\n", lineCount, $1);
+                    fprintf(stderr, "Undefined variable '%s' ", $1);
             }
             $$ = ast_create_assign($1, $3, lineCount);
         }
@@ -206,7 +269,7 @@ compound_assign:
         TOK_IDENTIFIER TOK_PLUS_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "LINE %d: Undefined variable '%s'\n", lineCount, $1);
+                fprintf(stderr, "Undefined variable '%s' ", $1);
                 error_count++;
             }
             $$ = ast_create_compound_assign($1, OP_PLUS_ASSIGN, $3, lineCount);
@@ -214,7 +277,7 @@ compound_assign:
         | TOK_IDENTIFIER TOK_MINUS_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "LINE %d: Undefined variable '%s'\n", lineCount, $1);
+                fprintf(stderr, "Undefined variable '%s'\n", $1);
                 error_count++;
             }
             $$ = ast_create_compound_assign($1, OP_MINUS_ASSIGN, $3, lineCount);
@@ -222,7 +285,7 @@ compound_assign:
         | TOK_IDENTIFIER TOK_MULT_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "LINE %d: Undefined variable '%s'\n", lineCount, $1);
+                fprintf(stderr, "Undefined variable '%s'\n", $1);
                 error_count++;
             }
             $$ = ast_create_compound_assign($1, OP_MULT_ASSIGN, $3, lineCount);
@@ -230,7 +293,7 @@ compound_assign:
         | TOK_IDENTIFIER TOK_DIV_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "LINE %d: Undefined variable '%s'\n", lineCount, $1);
+                fprintf(stderr, " Undefined variable '%s'\n", $1);
                 error_count++;
             }
             $$ = ast_create_compound_assign($1, OP_DIV_ASSIGN, $3, lineCount);
@@ -284,16 +347,12 @@ factor:
         }
     ;
 
-
-
 %%
 
-
 void yyerror(const char *s) {
-    fprintf(stderr, "Error at line %d: %s\n", lineCount, s);
+    fprintf(stderr, "Error at line %d: %s Unexpected: '%s' ", lineCount, s,yytext);
     error_count++;
 }
-
 
 
 int Semantic_analysis(){
