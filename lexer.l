@@ -55,8 +55,8 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 "flex"    { return TOK_FLEX; } 
 "shw"     { return TOK_SHW; }  
 
-    /* Newline as delimiter */
-\n        { return TOK_NEWLINE; }
+    /* Newline - handle both styles */
+\r?\n     { return TOK_NEWLINE; }
 
 
     /* Number literals */
@@ -113,7 +113,7 @@ ID        [a-zA-Z_][a-zA-Z0-9_]*
 
 
     /* Whitespace */
-[ \t\r]+  ;
+[ \t]+    ;
 
     /* Unknown characters */
 .          { 
