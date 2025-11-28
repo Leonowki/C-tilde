@@ -503,9 +503,9 @@ static const yytype_uint16 yyrline[] =
        0,    75,    75,    79,    83,    88,    96,   104,   113,   114,
      115,   119,   120,   121,   122,   127,   131,   135,   140,   148,
      156,   166,   175,   184,   197,   203,   209,   217,   223,   229,
-     237,   243,   249,   258,   269,   277,   285,   293,   305,   311,
-     312,   318,   319,   323,   324,   325,   329,   330,   331,   335,
-     336,   337,   338,   339,   344
+     237,   243,   249,   258,   269,   278,   287,   296,   308,   314,
+     315,   321,   322,   326,   327,   328,   332,   333,   334,   338,
+     339,   340,   350,   351,   360
 };
 #endif
 
@@ -1668,7 +1668,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 197 "parser.y"
     {
-            fprintf(stderr, "Expected identifier after 'nmbr', got '%s' ",yytext);
+            fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n ",yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1679,7 +1679,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 203 "parser.y"
     {
-            fprintf(stderr, "Expected identifier after 'chr', got '%s' ",yytext);
+            fprintf(stderr, "Expected identifier after 'chr', got '%s'\n ",yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1690,7 +1690,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 209 "parser.y"
     {
-            fprintf(stderr, "Expected identifier after 'flex', got '%s' ", yytext);
+            fprintf(stderr, "Expected identifier after 'flex', got '%s'\n ", yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1701,7 +1701,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 217 "parser.y"
     {
-            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s' ", (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1712,7 +1712,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 223 "parser.y"
     {
-            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s' ", (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1723,7 +1723,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 229 "parser.y"
     {
-            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s' ", (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1734,7 +1734,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 237 "parser.y"
     {
-            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s' ", (yyvsp[(2) - (4)].str), yytext);
+            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1745,7 +1745,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 243 "parser.y"
     {
-            fprintf(stderr, "Expected expression after 'chr %s =', got '%s' ", (yyvsp[(2) - (4)].str), yytext);
+            fprintf(stderr, "Expected expression after 'chr %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1756,7 +1756,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 249 "parser.y"
     {
-            fprintf(stderr,"Expected expression after 'flex %s =', got '%s' ", (yyvsp[(2) - (4)].str), yytext);
+            fprintf(stderr,"Expected expression after 'flex %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1770,7 +1770,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
                     error_count++;
-                    fprintf(stderr, "Undefined variable '%s' ", (yyvsp[(1) - (3)].str));
+                    fprintf(stderr, "Undefined variable '%s'\n ", (yyvsp[(1) - (3)].str));
             }
             (yyval.node) = ast_create_assign((yyvsp[(1) - (3)].str), (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1782,8 +1782,9 @@ yyreduce:
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
-                fprintf(stderr, "Undefined variable '%s' ", (yyvsp[(1) - (3)].str));
                 error_count++;
+                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_PLUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1791,12 +1792,13 @@ yyreduce:
 
   case 35:
 /* Line 1792 of yacc.c  */
-#line 277 "parser.y"
+#line 278 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
-                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
                 error_count++;
+                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MINUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1804,12 +1806,13 @@ yyreduce:
 
   case 36:
 /* Line 1792 of yacc.c  */
-#line 285 "parser.y"
+#line 287 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
-                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
                 error_count++;
+                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                    
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MULT_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1817,12 +1820,12 @@ yyreduce:
 
   case 37:
 /* Line 1792 of yacc.c  */
-#line 293 "parser.y"
+#line 296 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
-                fprintf(stderr, " Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
                 error_count++;
+                fprintf(stderr, " Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_DIV_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1830,7 +1833,7 @@ yyreduce:
 
   case 38:
 /* Line 1792 of yacc.c  */
-#line 305 "parser.y"
+#line 308 "parser.y"
     {
             (yyval.node) = ast_create_shw((yyvsp[(2) - (2)].node), lineCount);
         }
@@ -1838,13 +1841,13 @@ yyreduce:
 
   case 39:
 /* Line 1792 of yacc.c  */
-#line 311 "parser.y"
+#line 314 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 40:
 /* Line 1792 of yacc.c  */
-#line 312 "parser.y"
+#line 315 "parser.y"
     {
             (yyval.node) = ast_create_concat((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1852,89 +1855,102 @@ yyreduce:
 
   case 41:
 /* Line 1792 of yacc.c  */
-#line 318 "parser.y"
+#line 321 "parser.y"
     { (yyval.node) = ast_create_str_lit((yyvsp[(1) - (1)].str), lineCount); }
     break;
 
   case 42:
 /* Line 1792 of yacc.c  */
-#line 319 "parser.y"
+#line 322 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 43:
 /* Line 1792 of yacc.c  */
-#line 323 "parser.y"
+#line 326 "parser.y"
     { (yyval.node) = ast_create_binop(OP_ADD, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 44:
 /* Line 1792 of yacc.c  */
-#line 324 "parser.y"
+#line 327 "parser.y"
     { (yyval.node) = ast_create_binop(OP_SUB, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 45:
 /* Line 1792 of yacc.c  */
-#line 325 "parser.y"
+#line 328 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 46:
 /* Line 1792 of yacc.c  */
-#line 329 "parser.y"
+#line 332 "parser.y"
     { (yyval.node) = ast_create_binop(OP_MUL, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 47:
 /* Line 1792 of yacc.c  */
-#line 330 "parser.y"
+#line 333 "parser.y"
     { (yyval.node) = ast_create_binop(OP_DIV, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 48:
 /* Line 1792 of yacc.c  */
-#line 331 "parser.y"
+#line 334 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 49:
 /* Line 1792 of yacc.c  */
-#line 335 "parser.y"
+#line 338 "parser.y"
     { (yyval.node) = ast_create_num_lit((yyvsp[(1) - (1)].num), lineCount); }
     break;
 
   case 50:
 /* Line 1792 of yacc.c  */
-#line 336 "parser.y"
+#line 339 "parser.y"
     { (yyval.node) = ast_create_chr_lit((yyvsp[(1) - (1)].ch), lineCount); }
     break;
 
   case 51:
 /* Line 1792 of yacc.c  */
-#line 337 "parser.y"
-    { (yyval.node) = ast_create_ident((yyvsp[(1) - (1)].str), lineCount); }
+#line 340 "parser.y"
+    { 
+            Symbol *s = lookup((yyvsp[(1) - (1)].str));
+            if (!s) {
+                error_count++;
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (1)].str));
+                (yyval.node) = NULL;  // Return NULL to indicate error
+            } else {
+                (yyval.node) = ast_create_ident((yyvsp[(1) - (1)].str), lineCount);
+            }
+        }
     break;
 
   case 52:
 /* Line 1792 of yacc.c  */
-#line 338 "parser.y"
+#line 350 "parser.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
   case 53:
 /* Line 1792 of yacc.c  */
-#line 339 "parser.y"
+#line 351 "parser.y"
     {
             /* Unary minus: 0 - factor */
-            ASTNode *zero = ast_create_num_lit(0, lineCount);
-            (yyval.node) = ast_create_binop(OP_SUB, zero, (yyvsp[(2) - (2)].node), lineCount);
+            if (!(yyvsp[(2) - (2)].node)) {
+                (yyval.node) = NULL;
+            } else {
+                ASTNode *zero = ast_create_num_lit(0, lineCount);
+                (yyval.node) = ast_create_binop(OP_SUB, zero, (yyvsp[(2) - (2)].node), lineCount);
+            }
         }
     break;
 
   case 54:
 /* Line 1792 of yacc.c  */
-#line 344 "parser.y"
+#line 360 "parser.y"
     {
             /* Unary plus: just return factor */
             (yyval.node) = (yyvsp[(2) - (2)].node);
@@ -1943,7 +1959,7 @@ yyreduce:
 
 
 /* Line 1792 of yacc.c  */
-#line 1947 "parser.tab.c"
+#line 1963 "parser.tab.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -2175,7 +2191,7 @@ yyreturn:
 
 
 /* Line 2055 of yacc.c  */
-#line 350 "parser.y"
+#line 366 "parser.y"
 
 
 void yyerror(const char *s) {
@@ -2187,17 +2203,21 @@ void yyerror(const char *s) {
 int Semantic_analysis(){
     if(DEBUG_MODE)  printf("\n=== Semantic Analysis ===\n\n");
 
-            int semantic_errors = 0;
-            if (ast_check_semantics(root, &semantic_errors)) {
-                if(DEBUG_MODE) printf("Semantic analysis passed.\n");
-            } else {
-                if(DEBUG_MODE) printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
-                ast_free(root);
-                if(DEBUG_MODE) printf("\n=== Compilation Failed ===\n");
-                return 1;
-            }
-    return 0;//success
+    if(error_count > 0){
+        if(DEBUG_MODE) printf("Skipping semantic analysis due to %d previous error(s).\n", error_count);
+        return 1;
+    }
 
+    int semantic_errors = 0;
+    if (ast_check_semantics(root, &semantic_errors)) {
+        if(DEBUG_MODE) printf("Semantic analysis passed.\n");
+    } else {
+        if(DEBUG_MODE) printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
+        ast_free(root);
+        if(DEBUG_MODE) printf("\n=== Compilation Failed ===\n");
+        return 1;
+    }
+    return 0;//success
 }
 
 void print_symbol_table() {
@@ -2234,42 +2254,50 @@ void print_symbol_table() {
     printf("\n");
 }
 int main(int argc, char **argv) {
-
-
+    // Check for parsing errors first
+    printf("console:\"");
     int result = yyparse();
     
 
-    if (result == 0 && root && error_count == 0) {
-        /* printf("\n=== Abstract Syntax Tree ===\n\n"); */
-        if (DEBUG_MODE) ast_print(root, 0);
-
-        // Semantic Analysis
-        if(Semantic_analysis()!=0){
-            return 1; //exit on semantic error
-        }
-
-        //TAC Generation and Execution
-        TACProgram *tac = tac_generate(root);
-        printf("console:");
-        printf("\"");
-        //Compute memory offsets for all variables
-        compute_symbol_offsets();
-        tac_execute(tac); 
+    
+    if (result != 0 || !root) {
         printf("\",\n");
-        
-        //check symbol table values after execution
+        if (root) ast_free(root);
+        return 1;
+    }
+    
+    if (DEBUG_MODE) ast_print(root, 0);
+
+    // Semantic Analysis
+    int sem_result = Semantic_analysis();
+    if(sem_result != 0){
+        printf("\",\n");
+        return 1; //exit on semantic error
+    }
+
+    //TAC Generation and Execution
+    TACProgram *tac = tac_generate(root);
+    //Compute memory offsets for all variables
+    compute_symbol_offsets();
+    
+    int result_execute = tac_execute(tac); 
+    printf("\",\n");
+
+    if(result_execute == 0){
+
         if(DEBUG_MODE) {
             printf("\n=== Three-Address Code ===\n\n");
-        tac_print(tac);
+            tac_print(tac);
             printf("Parse result: %d, root: %p, error_count: %d\n", result, (void*)root, error_count);
             print_symbol_table();
         }
-        
         tac_generate_assembly(tac);
-
-        tac_free(tac);
-        ast_free(root);
     }
+    
+
+    tac_free(tac);
+    ast_free(root);
+    
 
     return 0;
 }

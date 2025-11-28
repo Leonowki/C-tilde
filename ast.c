@@ -24,7 +24,7 @@ ASTNode *ast_create_program(void) {
 }
 
 ASTNode *ast_add_stmt(ASTNode *program, ASTNode *stmt) {
-    if (!stmt) return program;  // This already exists, good!
+    if (!stmt) return program;  
     if (program->data.stmtList.count >= program->data.stmtList.capacity) {
         int newCap = program->data.stmtList.capacity == 0 ? 8 : program->data.stmtList.capacity * 2;
         program->data.stmtList.stmts = realloc(program->data.stmtList.stmts, newCap * sizeof(ASTNode *));
@@ -59,6 +59,8 @@ ASTNode *ast_create_ident(const char *name, int line) {
 }
 
 ASTNode *ast_create_binop(OpType op, ASTNode *left, ASTNode *right, int line) {
+    if (!left || !right) return NULL; 
+    
     ASTNode *node = ast_alloc(NODE_BINOP, line);
     node->data.binop.op = op;
     node->data.binop.left = left;
@@ -105,6 +107,7 @@ ASTNode *ast_create_shw(ASTNode *expr, int line) {
 }
 
 ASTNode *ast_create_concat(ASTNode *left, ASTNode *right, int line) {
+    if (!left || !right) return NULL;  
     ASTNode *node = ast_alloc(NODE_CONCAT, line);
     node->data.shw.left = left;
     node->data.shw.right = right;

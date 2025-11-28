@@ -46,7 +46,6 @@ Symbol *insert(const char *name, VarType type, int line, int *error) {
     newSym->memOffset = -1;
     newSym->size = get_size_for_type(type);
 
-    if (error) *error = 0;
     return newSym;
 }
 

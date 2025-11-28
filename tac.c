@@ -880,14 +880,14 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
 }
 
 
-void tac_execute(TACProgram *prog) {
-    if (!prog || !prog->head) return;
+int tac_execute(TACProgram *prog) {
+    if (!prog || !prog->head) return 1;
     
     /* Allocate temporary storage for all temps */
     int *tempValues = calloc(prog->tempCount, sizeof(int));
     if (!tempValues) {
         fprintf(stderr, "Failed to allocate temp storage\n");
-        return;
+        return 1;
     }
     
     /* Execute each instruction */
@@ -932,7 +932,7 @@ void tac_execute(TACProgram *prog) {
                 if (right == 0) {
                     fprintf(stderr, "Runtime error at line %d: Division by zero\n", instr->line);
                     free(tempValues);
-                    return;
+                    return 1;
                 }
                 set_operand_value(instr->result, left / right, tempValues);
                 break;
@@ -963,6 +963,7 @@ void tac_execute(TACProgram *prog) {
     }
     
     free(tempValues);
+    return 0;
 }
 
 /* Get memory offset for variable/temp */

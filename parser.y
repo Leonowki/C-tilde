@@ -195,19 +195,19 @@ decl_item:
         
         /* Error: Missing identifier after type keyword */
         | TOK_NMBR error {
-            fprintf(stderr, "Expected identifier after 'nmbr', got '%s' ",yytext);
+            fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n ",yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_CHR error {
-            fprintf(stderr, "Expected identifier after 'chr', got '%s' ",yytext);
+            fprintf(stderr, "Expected identifier after 'chr', got '%s'\n ",yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_FLEX error {
-            fprintf(stderr, "Expected identifier after 'flex', got '%s' ", yytext);
+            fprintf(stderr, "Expected identifier after 'flex', got '%s'\n ", yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
@@ -215,19 +215,19 @@ decl_item:
         
         /* Error: Wrong token after identifier (expected ':' or newline/comma) */
         | TOK_NMBR TOK_IDENTIFIER error {
-            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s' ", $2, yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_CHR TOK_IDENTIFIER error {
-            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s' ", $2, yytext);
+            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_FLEX TOK_IDENTIFIER error {
-            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s' ", $2, yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
@@ -235,19 +235,19 @@ decl_item:
         
         /* Error: Missing or invalid expression after ':' */
         | TOK_NMBR TOK_IDENTIFIER TOK_ASSIGN error {
-            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s' ", $2, yytext);
+            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN error {
-            fprintf(stderr, "Expected expression after 'chr %s =', got '%s' ", $2, yytext);
+            fprintf(stderr, "Expected expression after 'chr %s =', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN error {
-            fprintf(stderr,"Expected expression after 'flex %s =', got '%s' ", $2, yytext);
+            fprintf(stderr,"Expected expression after 'flex %s =', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
@@ -259,7 +259,7 @@ assignment:
             Symbol *s = lookup($1);
             if (!s) {
                     error_count++;
-                    fprintf(stderr, "Undefined variable '%s' ", $1);
+                    fprintf(stderr, "Undefined variable '%s'\n ", $1);
             }
             $$ = ast_create_assign($1, $3, lineCount);
         }
@@ -269,32 +269,35 @@ compound_assign:
         TOK_IDENTIFIER TOK_PLUS_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "Undefined variable '%s' ", $1);
                 error_count++;
+                fprintf(stderr, "Undefined variable '%s'\n", $1);
+                
             }
             $$ = ast_create_compound_assign($1, OP_PLUS_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_MINUS_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "Undefined variable '%s'\n", $1);
                 error_count++;
+                fprintf(stderr, "Undefined variable '%s'\n", $1);
+                
             }
             $$ = ast_create_compound_assign($1, OP_MINUS_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_MULT_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, "Undefined variable '%s'\n", $1);
                 error_count++;
+                fprintf(stderr, "Undefined variable '%s'\n", $1);
+                    
             }
             $$ = ast_create_compound_assign($1, OP_MULT_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_DIV_ASSIGN expr {
             Symbol *s = lookup($1);
             if (!s) {
-                fprintf(stderr, " Undefined variable '%s'\n", $1);
                 error_count++;
+                fprintf(stderr, " Undefined variable '%s'\n", $1);
             }
             $$ = ast_create_compound_assign($1, OP_DIV_ASSIGN, $3, lineCount);
         }
@@ -334,12 +337,25 @@ term:
 factor:
         TOK_NUMBER_LITERAL        { $$ = ast_create_num_lit($1, lineCount); }
         | TOK_CHAR_LITERAL        { $$ = ast_create_chr_lit($1, lineCount); }
-        | TOK_IDENTIFIER          { $$ = ast_create_ident($1, lineCount); }
+        | TOK_IDENTIFIER          { 
+            Symbol *s = lookup($1);
+            if (!s) {
+                error_count++;
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
+                $$ = NULL;  // Return NULL to indicate error
+            } else {
+                $$ = ast_create_ident($1, lineCount);
+            }
+        }
         | TOK_LPAREN expr TOK_RPAREN { $$ = $2; }
         | TOK_MINUS factor        {
             /* Unary minus: 0 - factor */
-            ASTNode *zero = ast_create_num_lit(0, lineCount);
-            $$ = ast_create_binop(OP_SUB, zero, $2, lineCount);
+            if (!$2) {
+                $$ = NULL;
+            } else {
+                ASTNode *zero = ast_create_num_lit(0, lineCount);
+                $$ = ast_create_binop(OP_SUB, zero, $2, lineCount);
+            }
         }
         | TOK_PLUS factor         {
             /* Unary plus: just return factor */
@@ -358,17 +374,21 @@ void yyerror(const char *s) {
 int Semantic_analysis(){
     if(DEBUG_MODE)  printf("\n=== Semantic Analysis ===\n\n");
 
-            int semantic_errors = 0;
-            if (ast_check_semantics(root, &semantic_errors)) {
-                if(DEBUG_MODE) printf("Semantic analysis passed.\n");
-            } else {
-                if(DEBUG_MODE) printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
-                ast_free(root);
-                if(DEBUG_MODE) printf("\n=== Compilation Failed ===\n");
-                return 1;
-            }
-    return 0;//success
+    if(error_count > 0){
+        if(DEBUG_MODE) printf("Skipping semantic analysis due to %d previous error(s).\n", error_count);
+        return 1;
+    }
 
+    int semantic_errors = 0;
+    if (ast_check_semantics(root, &semantic_errors)) {
+        if(DEBUG_MODE) printf("Semantic analysis passed.\n");
+    } else {
+        if(DEBUG_MODE) printf("Semantic analysis failed with %d error(s).\n", semantic_errors);
+        ast_free(root);
+        if(DEBUG_MODE) printf("\n=== Compilation Failed ===\n");
+        return 1;
+    }
+    return 0;//success
 }
 
 void print_symbol_table() {
@@ -405,42 +425,50 @@ void print_symbol_table() {
     printf("\n");
 }
 int main(int argc, char **argv) {
-
-
+    // Check for parsing errors first
+    printf("console:\"");
     int result = yyparse();
     
 
-    if (result == 0 && root && error_count == 0) {
-        /* printf("\n=== Abstract Syntax Tree ===\n\n"); */
-        if (DEBUG_MODE) ast_print(root, 0);
-
-        // Semantic Analysis
-        if(Semantic_analysis()!=0){
-            return 1; //exit on semantic error
-        }
-
-        //TAC Generation and Execution
-        TACProgram *tac = tac_generate(root);
-        printf("console:");
-        printf("\"");
-        //Compute memory offsets for all variables
-        compute_symbol_offsets();
-        tac_execute(tac); 
+    
+    if (result != 0 || !root) {
         printf("\",\n");
-        
-        //check symbol table values after execution
+        if (root) ast_free(root);
+        return 1;
+    }
+    
+    if (DEBUG_MODE) ast_print(root, 0);
+
+    // Semantic Analysis
+    int sem_result = Semantic_analysis();
+    if(sem_result != 0){
+        printf("\",\n");
+        return 1; //exit on semantic error
+    }
+
+    //TAC Generation and Execution
+    TACProgram *tac = tac_generate(root);
+    //Compute memory offsets for all variables
+    compute_symbol_offsets();
+    
+    int result_execute = tac_execute(tac); 
+    printf("\",\n");
+
+    if(result_execute == 0){
+
         if(DEBUG_MODE) {
             printf("\n=== Three-Address Code ===\n\n");
-        tac_print(tac);
+            tac_print(tac);
             printf("Parse result: %d, root: %p, error_count: %d\n", result, (void*)root, error_count);
             print_symbol_table();
         }
-        
         tac_generate_assembly(tac);
-
-        tac_free(tac);
-        ast_free(root);
     }
+    
+
+    tac_free(tac);
+    ast_free(root);
+    
 
     return 0;
 }
