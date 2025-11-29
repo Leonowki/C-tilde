@@ -221,7 +221,7 @@ decl_item:
             $$ = NULL;
         }
         | TOK_CHR TOK_IDENTIFIER error {
-            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", $2, yytext);
+            fprintf(stderr, "Error at line %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", lineCount, $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
