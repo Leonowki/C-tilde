@@ -1770,7 +1770,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
                     error_count++;
-                    fprintf(stderr, "Undefined variable '%s'\n ", (yyvsp[(1) - (3)].str));
+                    fprintf(stderr, "Error at line %d: Undefined variable '%s'\n ", lineCount, (yyvsp[(1) - (3)].str));
             }
             (yyval.node) = ast_create_assign((yyvsp[(1) - (3)].str), (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1783,7 +1783,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
                 
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_PLUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
@@ -1797,7 +1797,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
                 
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MINUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
@@ -1811,7 +1811,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
                     
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MULT_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
@@ -1825,7 +1825,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
                 error_count++;
-                fprintf(stderr, " Undefined variable '%s'\n", (yyvsp[(1) - (3)].str));
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
             }
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_DIV_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -2227,14 +2227,12 @@ void print_symbol_table() {
     
     for (int i = 0; i < symcount; i++) {
         Symbol *s = &symtab[i];
-        
         // Print name, type, offset, and size
         printf("%-15s %-10s %-10d %-10d ", 
                 s->name, 
                 type_to_string(s->type),
                 s->memOffset,
                 s->size);
-        
         // Print value
         if (s->type == TYPE_NMBR || (s->type == TYPE_FLEX && s->flexType == FLEX_NUMBER)) {
             printf("%d\n", s->numVal);

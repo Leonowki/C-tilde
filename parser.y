@@ -259,7 +259,7 @@ assignment:
             Symbol *s = lookup($1);
             if (!s) {
                     error_count++;
-                    fprintf(stderr, "Undefined variable '%s'\n ", $1);
+                    fprintf(stderr, "Error at line %d: Undefined variable '%s'\n ", lineCount, $1);
             }
             $$ = ast_create_assign($1, $3, lineCount);
         }
@@ -270,7 +270,7 @@ compound_assign:
             Symbol *s = lookup($1);
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Undefined variable '%s'\n", $1);
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
                 
             }
             $$ = ast_create_compound_assign($1, OP_PLUS_ASSIGN, $3, lineCount);
@@ -279,7 +279,7 @@ compound_assign:
             Symbol *s = lookup($1);
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Undefined variable '%s'\n", $1);
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
                 
             }
             $$ = ast_create_compound_assign($1, OP_MINUS_ASSIGN, $3, lineCount);
@@ -288,7 +288,7 @@ compound_assign:
             Symbol *s = lookup($1);
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Undefined variable '%s'\n", $1);
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
                     
             }
             $$ = ast_create_compound_assign($1, OP_MULT_ASSIGN, $3, lineCount);
@@ -297,7 +297,7 @@ compound_assign:
             Symbol *s = lookup($1);
             if (!s) {
                 error_count++;
-                fprintf(stderr, " Undefined variable '%s'\n", $1);
+                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
             }
             $$ = ast_create_compound_assign($1, OP_DIV_ASSIGN, $3, lineCount);
         }
@@ -398,14 +398,12 @@ void print_symbol_table() {
     
     for (int i = 0; i < symcount; i++) {
         Symbol *s = &symtab[i];
-        
         // Print name, type, offset, and size
         printf("%-15s %-10s %-10d %-10d ", 
                 s->name, 
                 type_to_string(s->type),
                 s->memOffset,
                 s->size);
-        
         // Print value
         if (s->type == TYPE_NMBR || (s->type == TYPE_FLEX && s->flexType == FLEX_NUMBER)) {
             printf("%d\n", s->numVal);
