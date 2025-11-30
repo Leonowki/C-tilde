@@ -196,19 +196,19 @@ decl_item:
         
         /* Error: Missing identifier after type keyword */
         | TOK_NMBR error {
-            fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n ",yytext);
+            fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n",yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_CHR error {
-            fprintf(stderr, "Expected identifier after 'chr', got '%s'\n ",yytext);
+            fprintf(stderr, "Expected identifier after 'chr', got '%s'\n",yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_FLEX error {
-            fprintf(stderr, "Expected identifier after 'flex', got '%s'\n ", yytext);
+            fprintf(stderr, "Expected identifier after 'flex', got '%s'\n", yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
@@ -216,19 +216,19 @@ decl_item:
         
         /* Error: Wrong token after identifier (expected ':' or newline/comma) */
         | TOK_NMBR TOK_IDENTIFIER error {
-            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n ", $2, yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_CHR TOK_IDENTIFIER error {
-            fprintf(stderr, "Error at line %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", lineCount, $2, yytext);
+            fprintf(stderr, "Error at line %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n", lineCount, $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_FLEX TOK_IDENTIFIER error {
-            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n ", $2, yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;

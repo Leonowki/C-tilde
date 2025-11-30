@@ -1669,7 +1669,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 198 "parser.y"
     {
-            fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n ",yytext);
+            fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n",yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1680,7 +1680,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 204 "parser.y"
     {
-            fprintf(stderr, "Expected identifier after 'chr', got '%s'\n ",yytext);
+            fprintf(stderr, "Expected identifier after 'chr', got '%s'\n",yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1691,7 +1691,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 210 "parser.y"
     {
-            fprintf(stderr, "Expected identifier after 'flex', got '%s'\n ", yytext);
+            fprintf(stderr, "Expected identifier after 'flex', got '%s'\n", yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1702,7 +1702,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 218 "parser.y"
     {
-            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1713,7 +1713,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 224 "parser.y"
     {
-            fprintf(stderr, "Error at line %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", lineCount, (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "Error at line %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n", lineCount, (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1724,7 +1724,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 230 "parser.y"
     {
-            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
