@@ -1735,7 +1735,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 238 "parser.y"
     {
-            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
+            fprintf(stderr, "Expected expression after 'nmbr %s :', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1746,7 +1746,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 244 "parser.y"
     {
-            fprintf(stderr, "Expected expression after 'chr %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
+            fprintf(stderr, "Expected expression after 'chr %s :', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1757,7 +1757,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 250 "parser.y"
     {
-            fprintf(stderr,"Expected expression after 'flex %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
+            fprintf(stderr,"Expected expression after 'flex %s :', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;

@@ -236,19 +236,19 @@ decl_item:
         
         /* Error: Missing or invalid expression after ':' */
         | TOK_NMBR TOK_IDENTIFIER TOK_ASSIGN error {
-            fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s'\n ", $2, yytext);
+            fprintf(stderr, "Expected expression after 'nmbr %s :', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN error {
-            fprintf(stderr, "Expected expression after 'chr %s =', got '%s'\n ", $2, yytext);
+            fprintf(stderr, "Expected expression after 'chr %s :', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
         }
         | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN error {
-            fprintf(stderr,"Expected expression after 'flex %s =', got '%s'\n ", $2, yytext);
+            fprintf(stderr,"Expected expression after 'flex %s :', got '%s'\n ", $2, yytext);
             error_count++;
             yyerrok;
             $$ = NULL;
