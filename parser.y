@@ -6,6 +6,7 @@
 #include "symbol_table.h"
 #include "ast.h"
 #include "tac.h"
+#include <windows.h>
 
 
 extern int yylex();
@@ -424,12 +425,15 @@ void print_symbol_table() {
 }
 int main(int argc, char **argv) {
     // Check for parsing errors first
+
+    LARGE_INTEGER frequency, start, end;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&start);
     printf("console:\"");
     int result = yyparse();
-    
-
-    
+        
     if (result != 0 || !root) {
+
         printf("\",\n");
         if (root) ast_free(root);
         return 1;
@@ -449,7 +453,10 @@ int main(int argc, char **argv) {
     //Compute memory offsets for all variables
     compute_symbol_offsets();
     
-    int result_execute = tac_execute(tac); 
+    int result_execute = tac_execute(tac);
+    QueryPerformanceCounter(&end);
+    double elapsed = (double)(end.QuadPart - start.QuadPart) * 1000.0 / frequency.QuadPart;
+    printf("\nExecution Time: %.3f ms\n", elapsed);
     printf("\",\n");
 
     if(result_execute == 0){

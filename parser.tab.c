@@ -72,6 +72,7 @@
 #include "symbol_table.h"
 #include "ast.h"
 #include "tac.h"
+#include <windows.h>
 
 
 extern int yylex();
@@ -88,7 +89,7 @@ bool DEBUG_MODE = false;
 
 
 /* Line 371 of yacc.c  */
-#line 92 "parser.tab.c"
+#line 93 "parser.tab.c"
 
 # ifndef YY_NULL
 #  if defined __cplusplus && 201103L <= __cplusplus
@@ -154,7 +155,7 @@ extern int yydebug;
 typedef union YYSTYPE
 {
 /* Line 387 of yacc.c  */
-#line 25 "parser.y"
+#line 26 "parser.y"
 
     int num;
     char ch;
@@ -163,7 +164,7 @@ typedef union YYSTYPE
 
 
 /* Line 387 of yacc.c  */
-#line 167 "parser.tab.c"
+#line 168 "parser.tab.c"
 } YYSTYPE;
 # define YYSTYPE_IS_TRIVIAL 1
 # define yystype YYSTYPE /* obsolescent; will be withdrawn */
@@ -191,7 +192,7 @@ int yyparse ();
 /* Copy the second part of user declarations.  */
 
 /* Line 390 of yacc.c  */
-#line 195 "parser.tab.c"
+#line 196 "parser.tab.c"
 
 #ifdef short
 # undef short
@@ -500,12 +501,12 @@ static const yytype_int8 yyrhs[] =
 /* YYRLINE[YYN] -- source line where rule number YYN was defined.  */
 static const yytype_uint16 yyrline[] =
 {
-       0,    75,    75,    79,    83,    88,    96,   104,   113,   114,
-     115,   119,   120,   121,   122,   127,   131,   135,   140,   148,
-     156,   166,   175,   184,   197,   203,   209,   217,   223,   229,
-     237,   243,   249,   258,   269,   278,   287,   296,   308,   314,
-     315,   321,   322,   326,   327,   328,   332,   333,   334,   338,
-     339,   340,   350,   351,   360
+       0,    76,    76,    80,    84,    89,    97,   105,   114,   115,
+     116,   120,   121,   122,   123,   128,   132,   136,   141,   149,
+     157,   167,   176,   185,   198,   204,   210,   218,   224,   230,
+     238,   244,   250,   259,   270,   279,   288,   297,   309,   315,
+     316,   322,   323,   327,   328,   329,   333,   334,   335,   339,
+     340,   341,   351,   352,   361
 };
 #endif
 
@@ -1460,7 +1461,7 @@ yyreduce:
     {
         case 2:
 /* Line 1792 of yacc.c  */
-#line 75 "parser.y"
+#line 76 "parser.y"
     { 
             root = (yyvsp[(1) - (1)].node); 
             (yyval.node) = (yyvsp[(1) - (1)].node);
@@ -1469,7 +1470,7 @@ yyreduce:
 
   case 3:
 /* Line 1792 of yacc.c  */
-#line 79 "parser.y"
+#line 80 "parser.y"
     {  /* Allow final statement without newline at EOF */
             root = ast_add_stmt((yyvsp[(1) - (2)].node), (yyvsp[(2) - (2)].node));  /* ADD: Set root here too */
             (yyval.node) = root;
@@ -1478,7 +1479,7 @@ yyreduce:
 
   case 4:
 /* Line 1792 of yacc.c  */
-#line 83 "parser.y"
+#line 84 "parser.y"
     {  /* Allow single statement without newline */
             root = ast_create_program();
             root = ast_add_stmt(root, (yyvsp[(1) - (1)].node));
@@ -1488,7 +1489,7 @@ yyreduce:
 
   case 5:
 /* Line 1792 of yacc.c  */
-#line 88 "parser.y"
+#line 89 "parser.y"
     { 
             root = ast_create_program(); 
             (yyval.node) = root; 
@@ -1497,7 +1498,7 @@ yyreduce:
 
   case 6:
 /* Line 1792 of yacc.c  */
-#line 96 "parser.y"
+#line 97 "parser.y"
     {
             if ((yyvsp[(2) - (2)].node) != NULL) {
                 (yyval.node) = ast_add_stmt((yyvsp[(1) - (2)].node), (yyvsp[(2) - (2)].node));
@@ -1510,7 +1511,7 @@ yyreduce:
 
   case 7:
 /* Line 1792 of yacc.c  */
-#line 104 "parser.y"
+#line 105 "parser.y"
     {
             (yyval.node) = ast_create_program();
             if ((yyvsp[(1) - (1)].node) != NULL) {
@@ -1522,55 +1523,55 @@ yyreduce:
 
   case 8:
 /* Line 1792 of yacc.c  */
-#line 113 "parser.y"
+#line 114 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (2)].node); }
     break;
 
   case 9:
 /* Line 1792 of yacc.c  */
-#line 114 "parser.y"
+#line 115 "parser.y"
     { (yyval.node) = NULL; }
     break;
 
   case 10:
 /* Line 1792 of yacc.c  */
-#line 115 "parser.y"
+#line 116 "parser.y"
     { error_count++; yyerrok; (yyval.node) = NULL; }
     break;
 
   case 11:
 /* Line 1792 of yacc.c  */
-#line 119 "parser.y"
+#line 120 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 12:
 /* Line 1792 of yacc.c  */
-#line 120 "parser.y"
+#line 121 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 13:
 /* Line 1792 of yacc.c  */
-#line 121 "parser.y"
+#line 122 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 14:
 /* Line 1792 of yacc.c  */
-#line 122 "parser.y"
+#line 123 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 15:
 /* Line 1792 of yacc.c  */
-#line 127 "parser.y"
+#line 128 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 16:
 /* Line 1792 of yacc.c  */
-#line 131 "parser.y"
+#line 132 "parser.y"
     {
             /* Create a declaration list node that holds multiple declarations */
             (yyval.node) = ast_create_decl_list((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount);
@@ -1579,13 +1580,13 @@ yyreduce:
 
   case 17:
 /* Line 1792 of yacc.c  */
-#line 135 "parser.y"
+#line 136 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 18:
 /* Line 1792 of yacc.c  */
-#line 140 "parser.y"
+#line 141 "parser.y"
     {
             Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_NMBR, lineCount, &error_count);
             if (!s) {
@@ -1598,7 +1599,7 @@ yyreduce:
 
   case 19:
 /* Line 1792 of yacc.c  */
-#line 148 "parser.y"
+#line 149 "parser.y"
     {
             Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_CHR, lineCount, &error_count);
             if (!s) {
@@ -1611,7 +1612,7 @@ yyreduce:
 
   case 20:
 /* Line 1792 of yacc.c  */
-#line 156 "parser.y"
+#line 157 "parser.y"
     {
             Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_FLEX, lineCount, &error_count);
             if (!s) {
@@ -1624,7 +1625,7 @@ yyreduce:
 
   case 21:
 /* Line 1792 of yacc.c  */
-#line 166 "parser.y"
+#line 167 "parser.y"
     {
             Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_NMBR, lineCount, &error_count);
             if (!s) {
@@ -1638,7 +1639,7 @@ yyreduce:
 
   case 22:
 /* Line 1792 of yacc.c  */
-#line 175 "parser.y"
+#line 176 "parser.y"
     {
             Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_CHR, lineCount, &error_count);
             if (!s) {
@@ -1652,7 +1653,7 @@ yyreduce:
 
   case 23:
 /* Line 1792 of yacc.c  */
-#line 184 "parser.y"
+#line 185 "parser.y"
     {
             Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_FLEX, lineCount, &error_count);
             if (!s) {
@@ -1666,7 +1667,7 @@ yyreduce:
 
   case 24:
 /* Line 1792 of yacc.c  */
-#line 197 "parser.y"
+#line 198 "parser.y"
     {
             fprintf(stderr, "Expected identifier after 'nmbr', got '%s'\n ",yytext);
             error_count++;
@@ -1677,7 +1678,7 @@ yyreduce:
 
   case 25:
 /* Line 1792 of yacc.c  */
-#line 203 "parser.y"
+#line 204 "parser.y"
     {
             fprintf(stderr, "Expected identifier after 'chr', got '%s'\n ",yytext);
             error_count++;
@@ -1688,7 +1689,7 @@ yyreduce:
 
   case 26:
 /* Line 1792 of yacc.c  */
-#line 209 "parser.y"
+#line 210 "parser.y"
     {
             fprintf(stderr, "Expected identifier after 'flex', got '%s'\n ", yytext);
             error_count++;
@@ -1699,7 +1700,7 @@ yyreduce:
 
   case 27:
 /* Line 1792 of yacc.c  */
-#line 217 "parser.y"
+#line 218 "parser.y"
     {
             fprintf(stderr, "Expected ':' or end of declaration after 'nmbr %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
@@ -1710,9 +1711,9 @@ yyreduce:
 
   case 28:
 /* Line 1792 of yacc.c  */
-#line 223 "parser.y"
+#line 224 "parser.y"
     {
-            fprintf(stderr, "LINE %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
+            fprintf(stderr, "Error at line %d: Expected ':' or end of declaration after 'chr %s', got '%s'\n ", lineCount, (yyvsp[(2) - (3)].str), yytext);
             error_count++;
             yyerrok;
             (yyval.node) = NULL;
@@ -1721,7 +1722,7 @@ yyreduce:
 
   case 29:
 /* Line 1792 of yacc.c  */
-#line 229 "parser.y"
+#line 230 "parser.y"
     {
             fprintf(stderr, "Expected ':' or end of declaration after 'flex %s', got '%s'\n ", (yyvsp[(2) - (3)].str), yytext);
             error_count++;
@@ -1732,7 +1733,7 @@ yyreduce:
 
   case 30:
 /* Line 1792 of yacc.c  */
-#line 237 "parser.y"
+#line 238 "parser.y"
     {
             fprintf(stderr, "Expected expression after 'nmbr %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
@@ -1743,7 +1744,7 @@ yyreduce:
 
   case 31:
 /* Line 1792 of yacc.c  */
-#line 243 "parser.y"
+#line 244 "parser.y"
     {
             fprintf(stderr, "Expected expression after 'chr %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
@@ -1754,7 +1755,7 @@ yyreduce:
 
   case 32:
 /* Line 1792 of yacc.c  */
-#line 249 "parser.y"
+#line 250 "parser.y"
     {
             fprintf(stderr,"Expected expression after 'flex %s =', got '%s'\n ", (yyvsp[(2) - (4)].str), yytext);
             error_count++;
@@ -1765,7 +1766,7 @@ yyreduce:
 
   case 33:
 /* Line 1792 of yacc.c  */
-#line 258 "parser.y"
+#line 259 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1778,7 +1779,7 @@ yyreduce:
 
   case 34:
 /* Line 1792 of yacc.c  */
-#line 269 "parser.y"
+#line 270 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1792,7 +1793,7 @@ yyreduce:
 
   case 35:
 /* Line 1792 of yacc.c  */
-#line 278 "parser.y"
+#line 279 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1806,7 +1807,7 @@ yyreduce:
 
   case 36:
 /* Line 1792 of yacc.c  */
-#line 287 "parser.y"
+#line 288 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1820,7 +1821,7 @@ yyreduce:
 
   case 37:
 /* Line 1792 of yacc.c  */
-#line 296 "parser.y"
+#line 297 "parser.y"
     {
             Symbol *s = lookup((yyvsp[(1) - (3)].str));
             if (!s) {
@@ -1833,7 +1834,7 @@ yyreduce:
 
   case 38:
 /* Line 1792 of yacc.c  */
-#line 308 "parser.y"
+#line 309 "parser.y"
     {
             (yyval.node) = ast_create_shw((yyvsp[(2) - (2)].node), lineCount);
         }
@@ -1841,13 +1842,13 @@ yyreduce:
 
   case 39:
 /* Line 1792 of yacc.c  */
-#line 314 "parser.y"
+#line 315 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 40:
 /* Line 1792 of yacc.c  */
-#line 315 "parser.y"
+#line 316 "parser.y"
     {
             (yyval.node) = ast_create_concat((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1855,67 +1856,67 @@ yyreduce:
 
   case 41:
 /* Line 1792 of yacc.c  */
-#line 321 "parser.y"
+#line 322 "parser.y"
     { (yyval.node) = ast_create_str_lit((yyvsp[(1) - (1)].str), lineCount); }
     break;
 
   case 42:
 /* Line 1792 of yacc.c  */
-#line 322 "parser.y"
+#line 323 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 43:
 /* Line 1792 of yacc.c  */
-#line 326 "parser.y"
+#line 327 "parser.y"
     { (yyval.node) = ast_create_binop(OP_ADD, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 44:
 /* Line 1792 of yacc.c  */
-#line 327 "parser.y"
+#line 328 "parser.y"
     { (yyval.node) = ast_create_binop(OP_SUB, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 45:
 /* Line 1792 of yacc.c  */
-#line 328 "parser.y"
+#line 329 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 46:
 /* Line 1792 of yacc.c  */
-#line 332 "parser.y"
+#line 333 "parser.y"
     { (yyval.node) = ast_create_binop(OP_MUL, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 47:
 /* Line 1792 of yacc.c  */
-#line 333 "parser.y"
+#line 334 "parser.y"
     { (yyval.node) = ast_create_binop(OP_DIV, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 48:
 /* Line 1792 of yacc.c  */
-#line 334 "parser.y"
+#line 335 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 49:
 /* Line 1792 of yacc.c  */
-#line 338 "parser.y"
+#line 339 "parser.y"
     { (yyval.node) = ast_create_num_lit((yyvsp[(1) - (1)].num), lineCount); }
     break;
 
   case 50:
 /* Line 1792 of yacc.c  */
-#line 339 "parser.y"
+#line 340 "parser.y"
     { (yyval.node) = ast_create_chr_lit((yyvsp[(1) - (1)].ch), lineCount); }
     break;
 
   case 51:
 /* Line 1792 of yacc.c  */
-#line 340 "parser.y"
+#line 341 "parser.y"
     { 
             Symbol *s = lookup((yyvsp[(1) - (1)].str));
             if (!s) {
@@ -1930,13 +1931,13 @@ yyreduce:
 
   case 52:
 /* Line 1792 of yacc.c  */
-#line 350 "parser.y"
+#line 351 "parser.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
   case 53:
 /* Line 1792 of yacc.c  */
-#line 351 "parser.y"
+#line 352 "parser.y"
     {
             /* Unary minus: 0 - factor */
             if (!(yyvsp[(2) - (2)].node)) {
@@ -1950,7 +1951,7 @@ yyreduce:
 
   case 54:
 /* Line 1792 of yacc.c  */
-#line 360 "parser.y"
+#line 361 "parser.y"
     {
             /* Unary plus: just return factor */
             (yyval.node) = (yyvsp[(2) - (2)].node);
@@ -1959,7 +1960,7 @@ yyreduce:
 
 
 /* Line 1792 of yacc.c  */
-#line 1963 "parser.tab.c"
+#line 1964 "parser.tab.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -2191,7 +2192,7 @@ yyreturn:
 
 
 /* Line 2055 of yacc.c  */
-#line 366 "parser.y"
+#line 367 "parser.y"
 
 
 void yyerror(const char *s) {
@@ -2253,12 +2254,15 @@ void print_symbol_table() {
 }
 int main(int argc, char **argv) {
     // Check for parsing errors first
+
+    LARGE_INTEGER frequency, start, end;
+    QueryPerformanceFrequency(&frequency);
+    QueryPerformanceCounter(&start);
     printf("console:\"");
     int result = yyparse();
-    
-
-    
+        
     if (result != 0 || !root) {
+
         printf("\",\n");
         if (root) ast_free(root);
         return 1;
@@ -2278,7 +2282,10 @@ int main(int argc, char **argv) {
     //Compute memory offsets for all variables
     compute_symbol_offsets();
     
-    int result_execute = tac_execute(tac); 
+    int result_execute = tac_execute(tac);
+    QueryPerformanceCounter(&end);
+    double elapsed = (double)(end.QuadPart - start.QuadPart) * 1000.0 / frequency.QuadPart;
+    printf("\nExecution Time: %.3f ms\n", elapsed);
     printf("\",\n");
 
     if(result_execute == 0){

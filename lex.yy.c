@@ -442,6 +442,8 @@ char *yytext;
 #include "ast.h"
 #include "parser.tab.h"    
 
+
+
 static char *unquote_string(const char *s) {
     size_t len = strlen(s);
     if (len < 2) return strdup("");
@@ -468,7 +470,7 @@ static char *unquote_string(const char *s) {
 }
 #define COMMENT 1
 
-#line 472 "lex.yy.c"
+#line 474 "lex.yy.c"
 
 /* Macros after this point can all be overridden by user definitions in
  * section 1.
@@ -619,11 +621,11 @@ YY_DECL
 	register char *yy_cp, *yy_bp;
 	register int yy_act;
 
-#line 42 "lexer.l"
+#line 44 "lexer.l"
 
 
     /* Comments - must come before catch-all */
-#line 627 "lex.yy.c"
+#line 629 "lex.yy.c"
 
 	if ( yy_init )
 		{
@@ -716,65 +718,65 @@ do_action:	/* This label is used only to access EOF actions. */
 	{ /* beginning of action switch */
 case 1:
 YY_RULE_SETUP
-#line 45 "lexer.l"
+#line 47 "lexer.l"
 ;
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 46 "lexer.l"
+#line 48 "lexer.l"
 ;
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 47 "lexer.l"
+#line 49 "lexer.l"
 { BEGIN(COMMENT); }
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 48 "lexer.l"
+#line 50 "lexer.l"
 { BEGIN(INITIAL); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 49 "lexer.l"
+#line 51 "lexer.l"
 { }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 50 "lexer.l"
+#line 52 "lexer.l"
 { }
 	YY_BREAK
 /* Keywords */
 case 7:
 YY_RULE_SETUP
-#line 53 "lexer.l"
+#line 55 "lexer.l"
 { return TOK_NMBR; } 
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 54 "lexer.l"
+#line 56 "lexer.l"
 { return TOK_CHR; } 
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 55 "lexer.l"
+#line 57 "lexer.l"
 { return TOK_FLEX; } 
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 56 "lexer.l"
+#line 58 "lexer.l"
 { return TOK_SHW; }  
 	YY_BREAK
 /* Newline - handle both styles */
 case 11:
 YY_RULE_SETUP
-#line 59 "lexer.l"
+#line 61 "lexer.l"
 { return TOK_NEWLINE; }
 	YY_BREAK
 /* Number literals */
 case 12:
 YY_RULE_SETUP
-#line 63 "lexer.l"
+#line 65 "lexer.l"
 {
             yylval.num = atoi(yytext);
             return TOK_NUMBER_LITERAL;
@@ -783,105 +785,105 @@ YY_RULE_SETUP
 /* Compound assignment operators (must come before single char operators) */
 case 13:
 YY_RULE_SETUP
-#line 69 "lexer.l"
+#line 71 "lexer.l"
 { return TOK_PLUS_ASSIGN; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 70 "lexer.l"
+#line 72 "lexer.l"
 { return TOK_MINUS_ASSIGN; }
 	YY_BREAK
 case 15:
 YY_RULE_SETUP
-#line 71 "lexer.l"
+#line 73 "lexer.l"
 { return TOK_MULT_ASSIGN; }
 	YY_BREAK
 case 16:
 YY_RULE_SETUP
-#line 72 "lexer.l"
+#line 74 "lexer.l"
 { return TOK_DIV_ASSIGN; }
 	YY_BREAK
 /* Single char operators and delimiters */
 case 17:
 YY_RULE_SETUP
-#line 75 "lexer.l"
+#line 77 "lexer.l"
 { return TOK_ASSIGN; }
 	YY_BREAK
 case 18:
 YY_RULE_SETUP
-#line 76 "lexer.l"
+#line 78 "lexer.l"
 { return TOK_CONCAT; }
 	YY_BREAK
 case 19:
 YY_RULE_SETUP
-#line 77 "lexer.l"
+#line 79 "lexer.l"
 { return TOK_PLUS; }
 	YY_BREAK
 case 20:
 YY_RULE_SETUP
-#line 78 "lexer.l"
+#line 80 "lexer.l"
 { return TOK_MINUS; }
 	YY_BREAK
 case 21:
 YY_RULE_SETUP
-#line 79 "lexer.l"
+#line 81 "lexer.l"
 { return TOK_MULT; }
 	YY_BREAK
 case 22:
 YY_RULE_SETUP
-#line 80 "lexer.l"
+#line 82 "lexer.l"
 { return TOK_DIV; }
 	YY_BREAK
 case 23:
 YY_RULE_SETUP
-#line 81 "lexer.l"
+#line 83 "lexer.l"
 { return TOK_COMMA; }
 	YY_BREAK
 case 24:
 YY_RULE_SETUP
-#line 82 "lexer.l"
+#line 84 "lexer.l"
 { return TOK_LPAREN; }
 	YY_BREAK
 case 25:
 YY_RULE_SETUP
-#line 83 "lexer.l"
+#line 85 "lexer.l"
 { return TOK_RPAREN; }
 	YY_BREAK
 case 26:
 YY_RULE_SETUP
-#line 85 "lexer.l"
+#line 87 "lexer.l"
 { /* ignore backslash + optional spaces + newline */ }
 	YY_BREAK
 /* Character literals - escape sequences */
 case 27:
 YY_RULE_SETUP
-#line 88 "lexer.l"
+#line 90 "lexer.l"
 { yylval.ch = '\n'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 28:
 YY_RULE_SETUP
-#line 89 "lexer.l"
+#line 91 "lexer.l"
 { yylval.ch = '\t'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 29:
 YY_RULE_SETUP
-#line 90 "lexer.l"
+#line 92 "lexer.l"
 { yylval.ch = '\\'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 30:
 YY_RULE_SETUP
-#line 91 "lexer.l"
+#line 93 "lexer.l"
 { yylval.ch = '\''; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 case 31:
 YY_RULE_SETUP
-#line 92 "lexer.l"
+#line 94 "lexer.l"
 { yylval.ch = '\0'; return TOK_CHAR_LITERAL; }
 	YY_BREAK
 /* Character literals - regular */
 case 32:
 YY_RULE_SETUP
-#line 95 "lexer.l"
+#line 97 "lexer.l"
 {
             yylval.ch = yytext[1];
             return TOK_CHAR_LITERAL;
@@ -890,7 +892,7 @@ YY_RULE_SETUP
 /* String literals */
 case 33:
 YY_RULE_SETUP
-#line 101 "lexer.l"
+#line 103 "lexer.l"
 {
             yylval.str = unquote_string(yytext);
             return TOK_STRING_LITERAL;
@@ -899,7 +901,7 @@ YY_RULE_SETUP
 /* Identifiers */
 case 34:
 YY_RULE_SETUP
-#line 109 "lexer.l"
+#line 111 "lexer.l"
 {
             yylval.str = strdup(yytext);
             return TOK_IDENTIFIER;
@@ -908,13 +910,13 @@ YY_RULE_SETUP
 /* Whitespace */
 case 35:
 YY_RULE_SETUP
-#line 116 "lexer.l"
+#line 118 "lexer.l"
 ;
 	YY_BREAK
 /* Unknown characters */
 case 36:
 YY_RULE_SETUP
-#line 119 "lexer.l"
+#line 121 "lexer.l"
 { 
             fprintf(stderr, "Error at line %d: Unexpected character '%s'\n", 
                     yylineno, yytext);
@@ -923,10 +925,10 @@ YY_RULE_SETUP
 	YY_BREAK
 case 37:
 YY_RULE_SETUP
-#line 125 "lexer.l"
+#line 127 "lexer.l"
 ECHO;
 	YY_BREAK
-#line 930 "lex.yy.c"
+#line 932 "lex.yy.c"
 			case YY_STATE_EOF(INITIAL):
 			case YY_STATE_EOF(COMMENT):
 				yyterminate();
@@ -1811,7 +1813,7 @@ int main()
 	return 0;
 	}
 #endif
-#line 125 "lexer.l"
+#line 127 "lexer.l"
 
 
 int yywrap(void) {
