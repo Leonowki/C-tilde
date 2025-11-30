@@ -342,7 +342,7 @@ factor:
             Symbol *s = lookup($1);
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
+                fprintf(stderr, "\nError at line %d: Undefined variable '%s'\n", lineCount, $1);
                 $$ = NULL;  // Return NULL to indicate error
             } else {
                 $$ = ast_create_ident($1, lineCount);
@@ -367,7 +367,7 @@ factor:
 %%
 
 void yyerror(const char *s) {
-    fprintf(stderr, "Error at line %d: %s Unexpected: '%s' ", lineCount, s,yytext);
+    fprintf(stderr, "Error at line %d: %s Unexpected: '%s'\n", lineCount, s,yytext);
     error_count++;
 }
 

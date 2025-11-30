@@ -1921,7 +1921,7 @@ yyreduce:
             Symbol *s = lookup((yyvsp[(1) - (1)].str));
             if (!s) {
                 error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (1)].str));
+                fprintf(stderr, "\nError at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (1)].str));
                 (yyval.node) = NULL;  // Return NULL to indicate error
             } else {
                 (yyval.node) = ast_create_ident((yyvsp[(1) - (1)].str), lineCount);
@@ -2196,7 +2196,7 @@ yyreturn:
 
 
 void yyerror(const char *s) {
-    fprintf(stderr, "Error at line %d: %s Unexpected: '%s' ", lineCount, s,yytext);
+    fprintf(stderr, "Error at line %d: %s Unexpected: '%s'\n", lineCount, s,yytext);
     error_count++;
 }
 
