@@ -2299,10 +2299,8 @@ int main(int argc, char **argv) {
         tac_generate_assembly(tac);
     }
     
-
     tac_free(tac);
     ast_free(root);
-    
 
     return 0;
 }

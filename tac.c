@@ -167,13 +167,29 @@ static int allocate_register_for_temp(TACInstr *current, int tempNum,
         return regIdx;
     }
     
-    // Find a register to use
+    // First, try to find an empty register or one with a dead temp
+    for (int i = 0; i < NUM_WORK_REGS; i++) {
+        if (regState[i].tempNum == -1) {
+            // Empty register - use it
+            regState[i].tempNum = tempNum;
+            regState[i].lastUseDistance = find_next_use_distance(current, tempNum);
+            regState[i].isDirty = 0;
+            return i;
+        }
+        
+        // Check if this register holds a dead temp (never used again)
+        if (find_next_use_distance(current, regState[i].tempNum) == 9999) {
+            // This temp is dead - can safely reuse
+            regState[i].tempNum = tempNum;
+            regState[i].lastUseDistance = find_next_use_distance(current, tempNum);
+            regState[i].isDirty = 0;
+            return i;
+        }
+    }
+    //HMMMMM
     regIdx = find_register_to_evict(current);
-    
-    // Spill current contents if needed
     spill_register(regIdx, output, hex_out, bin_out, tempStorageOffset);
     
-    // Allocate to this temp
     regState[regIdx].tempNum = tempNum;
     regState[regIdx].lastUseDistance = find_next_use_distance(current, tempNum);
     regState[regIdx].isDirty = 0;
@@ -192,9 +208,17 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
             return regIdx; // Already loaded
         }
         
-        // Allocate register and load from memory
-        // First try to find an empty register that's not the excluded one
-        regIdx = -1;
+        // ERROR: Temp should be in a register but isn't
+        // This means register allocation failed
+        fprintf(stderr, "ERROR: Temp t%d not in register\n", op.val.tempNum);
+        return 0;
+        
+    } else if (op.type == OPERAND_VAR) {
+        // Variables are loaded from their memory location (NOT from tempStorage!)
+        // Find best register for loading variable
+        int regIdx = -1;
+        
+        // 1. Try empty register first
         for (int i = 0; i < NUM_WORK_REGS; i++) {
             if (i != excludeReg && regState[i].tempNum == -1) {
                 regIdx = i;
@@ -202,68 +226,35 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
             }
         }
         
-        // If no empty register, find one to evict (but not the excluded one)
+        // 2. Try register with dead temp
         if (regIdx == -1) {
-            int bestReg = -1;
-            int maxDistance = -1;
-            
             for (int i = 0; i < NUM_WORK_REGS; i++) {
-                if (i == excludeReg) continue;
-                
-                if (bestReg == -1 || regState[i].lastUseDistance > maxDistance) {
-                    maxDistance = regState[i].lastUseDistance;
-                    bestReg = i;
+                if (i != excludeReg && regState[i].tempNum != -1) {
+                    if (find_next_use_distance(current, regState[i].tempNum) == 9999) {
+                        regIdx = i;
+                        break;
+                    }
                 }
             }
-            regIdx = bestReg;
         }
         
-        if (regIdx == -1) regIdx = 0; // Fallback (shouldn't happen)
-        
-        spill_register(regIdx, output, hex_out, bin_out, tempStorageOffset);
-        
-        int offset = tempStorageOffset + (op.val.tempNum * 8);
-        const char *regName = get_reg_name(regIdx);
-        
-        char line[256];
-        snprintf(line, sizeof(line), "ld %s, %d(r0)\n", regName, offset);
-        strcat(output, line);
-        
-        int rt = get_register_number(regName);
-        uint32_t machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)offset);
-        
-        char hex_str[32];
-        sprintf(hex_str, "0x%08X\n", machine_code);
-        strcat(hex_out, hex_str);
-        
-        char bin_str[40];
-        for (int i = 31; i >= 0; i--) {
-            sprintf(bin_str + (31 - i), "%d", (machine_code >> i) & 1);
-        }
-        strcat(bin_out, bin_str);
-        strcat(bin_out, "\n");
-        
-        regState[regIdx].tempNum = op.val.tempNum;
-        regState[regIdx].lastUseDistance = find_next_use_distance(current, op.val.tempNum);
-        regState[regIdx].isDirty = 0;
-        
-        return regIdx;
-        
-    } else if (op.type == OPERAND_VAR) {
-        // Variables always loaded from their memory location
-        // Find a register that's not the excluded one
-        int regIdx = -1;
-        for (int i = 0; i < NUM_WORK_REGS; i++) {
-            if (i != excludeReg) {
-                regIdx = i;
-                break;
+        // 3. Use any register except excluded
+        if (regIdx == -1) {
+            for (int i = 0; i < NUM_WORK_REGS; i++) {
+                if (i != excludeReg) {
+                    regIdx = i;
+                    break;
+                }
             }
         }
         
         if (regIdx == -1) regIdx = 0; // Fallback
         
-        spill_register(regIdx, output, hex_out, bin_out, tempStorageOffset);
+        // Clear register state - we're loading a variable, not tracking it as a temp
+        regState[regIdx].tempNum = -1;
+        regState[regIdx].isDirty = 0;
         
+        // Load variable from its actual memory location
         Symbol *s = lookup(op.val.varName);
         if (!s) return regIdx;
         
@@ -286,9 +277,6 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
         }
         strcat(bin_out, bin_str);
         strcat(bin_out, "\n");
-        
-        regState[regIdx].tempNum = -1; // Not tracking this
-        regState[regIdx].isDirty = 0;
         
         return regIdx;
     }
@@ -456,11 +444,13 @@ TACOperand tac_gen_expr_ctx(TACProgram *prog, ASTNode *node, int inShwContext) {
             int t = tac_new_temp(prog);
             TACOperand res = tac_operand_temp(t);
             res.isCharType = 1;
+            TACInstr *instr;
             if (inShwContext) {
-                tac_emit_shw(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
+                instr = tac_emit_shw(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
             } else {
-                tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
+                instr = tac_emit(prog, TAC_LOAD_INT, res, tac_operand_int((int)node->data.chrVal), tac_operand_none(), node->line);
             }
+            instr->resultIsChar = 1;
             return res;
         }
         
@@ -696,6 +686,11 @@ TACProgram *tac_generate(ASTNode *ast) {
 
 //handles printing with char type support
 static void print_operand_value(TACOperand op, int *tempValues, TACProgram *prog, int isCharContext) {
+    if (op.isCharType) {
+        isCharContext = 1;
+    }
+
+
     switch (op.type) {
         case OPERAND_INT:
             if (isCharContext) {
@@ -945,7 +940,30 @@ int tac_execute(TACProgram *prog) {
             }
 
             case TAC_CONCAT: {
-                print_operand_value(instr->arg1, tempValues, prog, instr->resultIsChar);
+                // Check if arg1 is a char type
+                int isCharContext = 0;
+                if (instr->arg1.type == OPERAND_TEMP) {
+                    // Find the instruction that created this temp to check if it's char
+                    TACInstr *check = prog->head;
+                    while (check) {
+                        if (check->result.type == OPERAND_TEMP && 
+                            check->result.val.tempNum == instr->arg1.val.tempNum) {
+                            isCharContext = check->resultIsChar;
+                            break;
+                        }
+                        check = check->next;
+                    }
+                } else if (instr->arg1.type == OPERAND_VAR) {
+                    Symbol *s = lookup(instr->arg1.val.varName);
+                    if (s && (s->type == TYPE_CHR || (s->type == TYPE_FLEX && s->flexType == FLEX_CHAR))) {
+                        isCharContext = 1;
+                    }
+                } else {
+                    // Use the isCharType flag on the operand itself
+                    isCharContext = instr->arg1.isCharType;
+                }
+                
+                print_operand_value(instr->arg1, tempValues, prog, isCharContext);
                 break;
             }
 
@@ -1184,12 +1202,32 @@ void tac_generate_assembly(TACProgram *prog) {
                 // Allocate destination register
                 int destReg;
                 if (instr->result.type == OPERAND_TEMP) {
-                    destReg = allocate_register_for_temp(instr, instr->result.val.tempNum,
-                                                        assembly_output, hex_output, binary_output,
-                                                        tempStorageOffset);
+                    // OPTIMIZATION: Try to reuse one of the source registers if possible
+                    // This is safe if the source temp is dead after this instruction
+                    
+                    // Check if left operand is a temp that dies here
+                    if (instr->arg1.type == OPERAND_TEMP && 
+                        find_next_use_distance(instr, instr->arg1.val.tempNum) == 9999) {
+                        destReg = leftReg;  // Reuse left register!
+                        regState[destReg].tempNum = instr->result.val.tempNum;
+                        regState[destReg].lastUseDistance = find_next_use_distance(instr, instr->result.val.tempNum);
+                    }
+                    // Check if right operand is a temp that dies here
+                    else if (instr->arg2.type == OPERAND_TEMP && 
+                            find_next_use_distance(instr, instr->arg2.val.tempNum) == 9999) {
+                        destReg = rightReg;  // Reuse right register!
+                        regState[destReg].tempNum = instr->result.val.tempNum;
+                        regState[destReg].lastUseDistance = find_next_use_distance(instr, instr->result.val.tempNum);
+                    }
+                    else {
+                        // Need a new register
+                        destReg = allocate_register_for_temp(instr, instr->result.val.tempNum,
+                                                            assembly_output, hex_output, binary_output,
+                                                            tempStorageOffset);
+                    }
                 } else {
+                    // Result is a variable, use any register
                     destReg = find_register_to_evict(instr);
-                    // Make sure we don't evict our source operands
                     if (destReg == leftReg || destReg == rightReg) {
                         for (int i = 0; i < NUM_WORK_REGS; i++) {
                             if (i != leftReg && i != rightReg) {
@@ -1198,9 +1236,8 @@ void tac_generate_assembly(TACProgram *prog) {
                             }
                         }
                     }
-                    spill_register(destReg, assembly_output, hex_output, binary_output, tempStorageOffset);
                 }
-                
+                                
                 const char *leftRegName = get_reg_name(leftReg);
                 const char *rightRegName = get_reg_name(rightReg);
                 const char *destRegName = get_reg_name(destReg);
@@ -1352,10 +1389,7 @@ void tac_generate_assembly(TACProgram *prog) {
         }
     }
     
-    // Spill any remaining dirty registers at the end
-    for (int i = 0; i < NUM_WORK_REGS; i++) {
-        spill_register(i, assembly_output, hex_output, binary_output, tempStorageOffset);
-    }
+
     
     printf("assembly:\n\"%s\",", assembly_output);
     printf("\nbinary:\n\"%s\",", binary_output);

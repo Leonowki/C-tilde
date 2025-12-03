@@ -36,9 +36,8 @@ typedef struct {
         int intVal;
         char *strVal;
     } val;
-    int isCharType;
+    int isCharType;  // ADD THIS FIELD
 } TACOperand;
-
 /* TAC Instruction */
 typedef struct TACInstr {
     TACOp op;

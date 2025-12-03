@@ -16,8 +16,7 @@ Symbol *lookup(const char *name) {
 Symbol *insert(const char *name, VarType type, int line, int *error) {
     Symbol *s = lookup(name);
     if (s) {
-        // Variable already exists - this is a redeclaration error
-        fprintf(stderr, "LINE %d: Variable '%s' is already declared (first declared as %s)\n", 
+        fprintf(stderr, "Error at line %d: Variable '%s' is already declared (first declared as %s)\n", 
                 line, name, type_to_string(s->type));
         if (error) *error = 1;
         return NULL;  // Return NULL to indicate error
@@ -77,14 +76,12 @@ void set_number(Symbol *s, int value) {
 }
 
 void set_char(Symbol *s, char value) {
-    if (s->type == TYPE_FLEX && s->strVal) {
-        free(s->strVal);
-        s->strVal = NULL;
-    }
-    s->chrVal = value;
-
-    if (s->type == TYPE_FLEX)
+    if (s->type == TYPE_FLEX) {
         s->flexType = FLEX_CHAR;
+        s->chrVal = value;
+    } else if (s->type == TYPE_CHR) {
+        s->chrVal = value;
+    }
 }
 
 FlexType get_runtime_type(Symbol *s) {
