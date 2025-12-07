@@ -492,6 +492,7 @@ TACOperand tac_gen_expr_ctx(TACProgram *prog, ASTNode *node, int inShwContext) {
             return res;
         }
         
+        
         case NODE_CONCAT: {
             TACOperand left = tac_gen_expr_ctx(prog, node->data.shw.left, inShwContext);
             TACOperand right = tac_gen_expr_ctx(prog, node->data.shw.right, inShwContext);
@@ -565,10 +566,15 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
         case NODE_DECL: {
             if (node->data.decl.initExpr) {
                 TACOperand val = tac_gen_expr(prog, node->data.decl.initExpr);
-                tac_emit(prog, TAC_COPY, tac_operand_var(node->data.decl.varName), val, tac_operand_none(), node->line);
+                TACInstr *instr = tac_emit(prog, TAC_COPY, tac_operand_var(node->data.decl.varName), val, tac_operand_none(), node->line);
+                // **FIX: Preserve char type through copy**
+                if (val.isCharType) {
+                    instr->arg1.isCharType = 1;  // Mark the source operand
+                }
             }
             break;
         }
+        
         case NODE_DECL_LIST: {
             tac_gen_stmt(prog, node->data.declList.left);
             tac_gen_stmt(prog, node->data.declList.right);
@@ -576,15 +582,21 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
         }
 
         case NODE_TYPE_DECL_LIST: {
-        process_name_list(prog, node->data.typeDeclList.varType, 
-                         node->data.typeDeclList.nameList, node->line);
-        break;
-        }
-        case NODE_ASSIGN: {
-            TACOperand val = tac_gen_expr(prog, node->data.assign.expr);
-            tac_emit(prog, TAC_COPY, tac_operand_var(node->data.assign.varName), val, tac_operand_none(), node->line);
+            process_name_list(prog, node->data.typeDeclList.varType, 
+                             node->data.typeDeclList.nameList, node->line);
             break;
         }
+        
+        case NODE_ASSIGN: {
+            TACOperand val = tac_gen_expr(prog, node->data.assign.expr);
+            TACInstr *instr = tac_emit(prog, TAC_COPY, tac_operand_var(node->data.assign.varName), val, tac_operand_none(), node->line);
+            // **FIX: Preserve char type through copy**
+            if (val.isCharType) {
+                instr->arg1.isCharType = 1;  // Mark the source operand
+            }
+            break;
+        }
+        
         case NODE_COMPOUND_ASSIGN: {
             TACOperand var = tac_operand_var(node->data.assign.varName);
             TACOperand val = tac_gen_expr(prog, node->data.assign.expr);
@@ -602,6 +614,7 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
             tac_emit(prog, TAC_COPY, tac_operand_var(node->data.assign.varName), res, tac_operand_none(), node->line);
             break;
         }
+        
         case NODE_SHW: {
             // Handle the entire shw expression tree
             tac_gen_shw_expr(prog, node->data.shw.left, node->line);
@@ -609,6 +622,7 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
             tac_emit(prog, TAC_PRINT, tac_operand_none(), tac_operand_str("\n"), tac_operand_none(), node->line);
             break;
         }
+        
         default:
             break;
     }
@@ -883,12 +897,16 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
-                // For flex types, determine the type based on the value being set
-                if (s->type == TYPE_FLEX) {
-                    // If the value looks like an ASCII printable char, store as char
-                    // Otherwise store as number
-                    if (value >= 0 && value <= 127) {
-                        // Could be either - we'll default to number for arithmetic results
+                // **FIX: Check if the value being set has char type info**
+                if (op.isCharType) {
+                    // This is a character value, use set_char
+                    set_char(s, (char)value);
+                }
+                // For flex types, determine the type based on context
+                else if (s->type == TYPE_FLEX) {
+                    // If assigning a char to flex, preserve char type
+                    if (op.isCharType || (value >= 0 && value <= 127)) {
+                        // For now, default to number unless explicitly marked as char
                         set_number(s, value);
                     } else {
                         set_number(s, value);
@@ -924,7 +942,17 @@ int tac_execute(TACProgram *prog) {
         switch (instr->op) {
             case TAC_LOAD_INT: {
                 int value = get_operand_value(instr->arg1, tempValues);
-                set_operand_value(instr->result, value, tempValues);
+                
+                // **FIX: Check if this is a character being loaded into a variable**
+                if (instr->result.type == OPERAND_VAR && 
+                    (instr->resultIsChar || instr->arg1.isCharType)) {
+                    Symbol *s = lookup(instr->result.val.varName);
+                    if (s) {
+                        set_char(s, (char)value);
+                    }
+                } else {
+                    set_operand_value(instr->result, value, tempValues);
+                }
                 break;
             }
             
@@ -969,7 +997,16 @@ int tac_execute(TACProgram *prog) {
             
             case TAC_COPY: {
                 int value = get_operand_value(instr->arg1, tempValues);
-                set_operand_value(instr->result, value, tempValues);
+                
+                // **FIX: Preserve character type information**
+                if (instr->result.type == OPERAND_VAR && instr->arg1.isCharType) {
+                    Symbol *s = lookup(instr->result.val.varName);
+                    if (s) {
+                        set_char(s, (char)value);
+                    }
+                } else {
+                    set_operand_value(instr->result, value, tempValues);
+                }
                 break;
             }
 
@@ -1017,6 +1054,7 @@ int tac_execute(TACProgram *prog) {
     free(tempValues);
     return 0;
 }
+
 
 /* Get memory offset for variable/temp */
 static int get_memory_offset(TACOperand op) {

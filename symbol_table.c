@@ -63,10 +63,10 @@ void set_number(Symbol *s, int value) {
         s->strVal = NULL;
     }
     
-    /* FIX: For chr type, store as character but allow integer assignment */
+    /* For chr type, store as character */
     if (s->type == TYPE_CHR) {
-        s->chrVal = (char)value;  // Store as char
-        s->numVal = value;         // Also store integer value for consistency
+        s->chrVal = (char)value;
+        s->numVal = value;
     } else {
         s->numVal = value;
     }
@@ -79,8 +79,10 @@ void set_char(Symbol *s, char value) {
     if (s->type == TYPE_FLEX) {
         s->flexType = FLEX_CHAR;
         s->chrVal = value;
+        s->numVal = (int)value;  // Store integer representation too
     } else if (s->type == TYPE_CHR) {
         s->chrVal = value;
+        s->numVal = (int)value;
     }
 }
 
