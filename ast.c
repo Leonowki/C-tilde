@@ -68,6 +68,7 @@ ASTNode *ast_create_binop(OpType op, ASTNode *left, ASTNode *right, int line) {
     return node;
 }
 
+
 ASTNode *ast_create_decl_list(ASTNode *left, ASTNode *right, int line) {
     ASTNode *node = ast_alloc(NODE_DECL_LIST, line);
     node->data.declList.left = left;
@@ -82,6 +83,8 @@ ASTNode *ast_create_decl(VarType type, const char *name, ASTNode *init, int line
     node->data.decl.initExpr = init;
     return node;
 }
+
+
 
 ASTNode *ast_create_assign(const char *name, ASTNode *expr, int line) {
     ASTNode *node = ast_alloc(NODE_ASSIGN, line);
@@ -113,16 +116,24 @@ ASTNode *ast_create_concat(ASTNode *left, ASTNode *right, int line) {
     node->data.shw.right = right;
     return node;
 }
+ASTNode *ast_create_type_decl_list(VarType type, ASTNode *nameList, int line) {
+    ASTNode *node = ast_alloc(NODE_TYPE_DECL_LIST, line);
+    node->data.typeDeclList.varType = type;
+    node->data.typeDeclList.nameList = nameList;
+    return node;
+}
 
-/* not used*/
-ASTNode *ast_create_stmt_list(ASTNode *left, ASTNode *right, int line) {
-    ASTNode *node = ast_alloc(NODE_STMT_LIST, line);
-    node->data.stmtList.stmts = NULL;
-    node->data.stmtList.count = 0;
-    node->data.stmtList.capacity = 0;
-    /* Add left and right as statements if needed */
-    if (left) ast_add_stmt(node, left);
-    if (right) ast_add_stmt(node, right);
+ASTNode *ast_create_name_list(ASTNode *left, ASTNode *right, int line) {
+    ASTNode *node = ast_alloc(NODE_NAME_LIST, line);
+    node->data.nameList.left = left;
+    node->data.nameList.right = right;
+    return node;
+}
+
+ASTNode *ast_create_name_item(const char *name, ASTNode *init, int line) {
+    ASTNode *node = ast_alloc(NODE_NAME_ITEM, line);
+    node->data.nameItem.name = strdup(name);
+    node->data.nameItem.initExpr = init;
     return node;
 }
 

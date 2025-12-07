@@ -523,6 +523,34 @@ void tac_gen_shw_expr(TACProgram *prog, ASTNode *node, int line) {
         tac_emit_shw(prog, TAC_CONCAT, tac_operand_none(), val, tac_operand_none(), line);
     }
 }
+static void process_name_list(TACProgram *prog, VarType type, ASTNode *nameList, int line) {
+    if (!nameList) return;
+    
+    if (nameList->type == NODE_NAME_LIST) {
+        process_name_list(prog, type, nameList->data.nameList.left, line);
+        process_name_list(prog, type, nameList->data.nameList.right, line);
+    } else if (nameList->type == NODE_NAME_ITEM) {
+        const char *name = nameList->data.nameItem.name;
+        ASTNode *init = nameList->data.nameItem.initExpr;
+        
+        // Symbol is already inserted - just generate TAC
+        if (init) {
+            TACOperand val = tac_gen_expr(prog, init);
+            tac_emit(prog, TAC_COPY, tac_operand_var(name), val, tac_operand_none(), line);
+        } else {
+            // Generate default initialization
+            TACOperand defaultVal;
+            if (type == TYPE_NMBR) {
+                defaultVal = tac_operand_int(0);
+            } else if (type == TYPE_CHR) {
+                defaultVal = tac_operand_int('\0');
+            } else {
+                defaultVal = tac_operand_str("");
+            }
+            tac_emit(prog, TAC_COPY, tac_operand_var(name), defaultVal, tac_operand_none(), line);
+        }
+    }
+}
 /* Generate TAC for statements */
 void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
     if (!node) return;
@@ -545,6 +573,12 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
             tac_gen_stmt(prog, node->data.declList.left);
             tac_gen_stmt(prog, node->data.declList.right);
             break;
+        }
+
+        case NODE_TYPE_DECL_LIST: {
+        process_name_list(prog, node->data.typeDeclList.varType, 
+                         node->data.typeDeclList.nameList, node->line);
+        break;
         }
         case NODE_ASSIGN: {
             TACOperand val = tac_gen_expr(prog, node->data.assign.expr);

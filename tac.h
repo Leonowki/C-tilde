@@ -2,9 +2,7 @@
 #define TAC_H
 
 #include "ast.h"
-#include "symbol_table.h"
 
-/* TAC Operation Types */
 typedef enum {
     TAC_ADD,
     TAC_SUB,
@@ -15,76 +13,61 @@ typedef enum {
     TAC_LOAD_STR,
     TAC_PRINT,
     TAC_CONCAT,
-    TAC_DECL
+    TAC_DECL,
 } TACOp;
 
-/* Operand Types */
 typedef enum {
     OPERAND_NONE,
     OPERAND_TEMP,
     OPERAND_VAR,
     OPERAND_INT,
-    OPERAND_STR
+    OPERAND_STR,
 } OperandType;
 
-/* TAC Operand */
 typedef struct {
     OperandType type;
+    int isCharType;
     union {
         int tempNum;
         char *varName;
         int intVal;
         char *strVal;
     } val;
-    int isCharType;  // ADD THIS FIELD
 } TACOperand;
-/* TAC Instruction */
+
 typedef struct TACInstr {
     TACOp op;
     TACOperand result;
     TACOperand arg1;
     TACOperand arg2;
     int line;
-    int inShwContext; 
+    int inShwContext;
     int resultIsChar;
     struct TACInstr *next;
 } TACInstr;
 
-/* TAC Program - linked list of instructions */
 typedef struct {
     TACInstr *head;
     TACInstr *tail;
     int tempCount;
 } TACProgram;
 
-/* Constructor functions */
+/* Function declarations */
 TACProgram *tac_create_program(void);
 TACOperand tac_operand_none(void);
 TACOperand tac_operand_temp(int num);
 TACOperand tac_operand_var(const char *name);
 TACOperand tac_operand_int(int val);
 TACOperand tac_operand_str(const char *val);
-
-/* Instruction emission */
-TACInstr *tac_emit(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TACOperand a2, int line);
 int tac_new_temp(TACProgram *prog);
-
-/* Code generation from AST */
-TACProgram *tac_generate(ASTNode *ast);
+TACInstr *tac_emit(TACProgram *prog, TACOp op, TACOperand res, TACOperand a1, TACOperand a2, int line);
 TACOperand tac_gen_expr(TACProgram *prog, ASTNode *node);
 void tac_gen_stmt(TACProgram *prog, ASTNode *node);
-
-/* Utility functions */
+TACProgram *tac_generate(ASTNode *ast);
 void tac_print(TACProgram *prog);
+int tac_execute(TACProgram *prog);
+void tac_generate_assembly(TACProgram *prog);
 void tac_free(TACProgram *prog);
 const char *tac_op_to_string(TACOp op);
-
-
-//execute tac
-int tac_execute(TACProgram *prog);
-
-//assembly code generation
-void tac_generate_assembly(TACProgram *prog);
-void tac_gen_shw_expr(TACProgram *prog, ASTNode *node, int line);
 
 #endif
