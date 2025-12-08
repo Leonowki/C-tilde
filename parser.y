@@ -215,15 +215,15 @@ compound_assign:
             $$ = ast_create_compound_assign($1, OP_PLUS_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_MINUS_ASSIGN expr {
-          
+
             $$ = ast_create_compound_assign($1, OP_MINUS_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_MULT_ASSIGN expr {
-           
+
             $$ = ast_create_compound_assign($1, OP_MULT_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_DIV_ASSIGN expr {
-           
+
             $$ = ast_create_compound_assign($1, OP_DIV_ASSIGN, $3, lineCount);
         }
         ;
@@ -349,7 +349,7 @@ int main(int argc, char **argv) {
     
     if (DEBUG_MODE) ast_print(root, 0);
 
-    // BUILD SYMBOL TABLE FIRST - before semantic analysis
+    //before semantic analysis, build symbol table for right sequence
     if (DEBUG_MODE) printf("\n=== Building Symbol Table ===\n");
     ast_build_symbol_table(root, &error_count);
     if (error_count > 0) {
@@ -359,7 +359,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // semantic analysis (which checks for undefined variables)
+    // semantic analysis 
     int sem_result = Semantic_analysis();
     if(sem_result != 0){
         printf("\",\n");
@@ -389,4 +389,6 @@ int main(int argc, char **argv) {
     ast_free(root);
 
     return 0;
+
+
 }

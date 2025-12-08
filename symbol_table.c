@@ -19,7 +19,7 @@ Symbol *insert(const char *name, VarType type, int line, int *error) {
         fprintf(stderr, "Error at line %d: Variable '%s' is already declared (first declared as %s)\n", 
                 line, name, type_to_string(s->type));
         if (error) *error = 1;
-        return NULL;  // Return NULL to indicate error
+        return NULL;
     }
 
     if (symcount >= MAX_SYMBOLS) {
@@ -108,8 +108,14 @@ int get_size_for_type(VarType type) {
 //after parsing is complete, before TAC generation
 void compute_symbol_offsets(void) {
     int currentOffset = 0;
-    //compute offsets
+    
+    // Compute offsets with proper alignment
     for (int i = 0; i < symcount; i++) {
+        // Uncomment the next 3 lines if you want alignment
+        // if (symtab[i].type == TYPE_NMBR || symtab[i].type == TYPE_FLEX) {
+        //     currentOffset = (currentOffset + 3) & ~3; // Align to 4-byte boundary
+        // }
+        
         symtab[i].memOffset = currentOffset;
         currentOffset += symtab[i].size;
     }
@@ -117,8 +123,11 @@ void compute_symbol_offsets(void) {
     if(DEBUG_MODE_SYMB){
         printf("\n=== Memory Layout ===\n");
         for (int i = 0; i < symcount; i++) {
-            printf("%s: offset=%d, size=%d bytes\n", 
-                symtab[i].name, symtab[i].memOffset, symtab[i].size);
+            printf("%s: type=%s, offset=%d, size=%d bytes\n", 
+                symtab[i].name, 
+                type_to_string(symtab[i].type),
+                symtab[i].memOffset, 
+                symtab[i].size);
         }
         printf("Total memory required: %d bytes\n\n", currentOffset);
     }

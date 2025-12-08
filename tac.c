@@ -17,6 +17,12 @@
 #define FUNCT_DDIV      0x1E
 #define FUNCT_MFLO      0x12
 
+#define OPCODE_LB       0x20   // Load byte
+#define OPCODE_SB       0x28   // Store byte
+#define OPCODE_LW       0x23   // Load word
+#define OPCODE_SW       0x2B   // Store word
+#define OPCODE_ADDIU    0x09   // Add immediate unsigned (32-bit)
+
 
 
 /* MIPS64 Instruction Formats */
@@ -35,6 +41,30 @@ typedef struct {
     int isDirty;          
 } RegisterState;
 
+/* Get instruction mnemonic for assembly output */
+static const char* get_load_mnemonic(VarType type) {
+    switch (type) {
+        case TYPE_CHR: return "lb";
+        case TYPE_NMBR: return "lw";
+        case TYPE_FLEX: 
+        default: return "lw";
+    }
+}
+
+static const char* get_store_mnemonic(VarType type) {
+    switch (type) {
+        case TYPE_CHR: return "sb";
+        case TYPE_NMBR: return "sw";
+        case TYPE_FLEX:
+        default: return "sw";
+    }
+}
+
+static const char* get_imm_mnemonic(VarType type) {
+   
+    return "daddiu";
+}
+
 #define NUM_WORK_REGS 8 
 static RegisterState regState[NUM_WORK_REGS];
 
@@ -43,6 +73,7 @@ static int get_register_number(const char *reg);
 static uint32_t encode_i_format(int opcode, int rs, int rt, int16_t immediate);
 static uint32_t encode_r_format(int funct, int rs, int rt, int rd, int shamt);
 static int find_temp_in_register(int tempNum);
+static void get_load_store_opcodes(VarType type, int *load_opcode, int *store_opcode, int *imm_opcode);
 
 /* Initialize register state */
 static void init_register_state(void) {
@@ -202,23 +233,17 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
                        int tempStorageOffset, int excludeReg) {
     
     if (op.type == OPERAND_TEMP) {
-        // Check if already in register
         int regIdx = find_temp_in_register(op.val.tempNum);
         if (regIdx != -1) {
-            return regIdx; // Already loaded
+            return regIdx;
         }
-        
-        // ERROR: Temp should be in a register but isn't
-        // This means register allocation failed
         fprintf(stderr, "ERROR: Temp t%d not in register\n", op.val.tempNum);
         return 0;
         
     } else if (op.type == OPERAND_VAR) {
-        // Variables are loaded from their memory location (NOT from tempStorage!)
-        // Find best register for loading variable
         int regIdx = -1;
         
-        // 1. Try empty register first
+        // Find best register
         for (int i = 0; i < NUM_WORK_REGS; i++) {
             if (i != excludeReg && regState[i].tempNum == -1) {
                 regIdx = i;
@@ -226,7 +251,6 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
             }
         }
         
-        // 2. Try register with dead temp
         if (regIdx == -1) {
             for (int i = 0; i < NUM_WORK_REGS; i++) {
                 if (i != excludeReg && regState[i].tempNum != -1) {
@@ -238,7 +262,6 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
             }
         }
         
-        // 3. Use any register except excluded
         if (regIdx == -1) {
             for (int i = 0; i < NUM_WORK_REGS; i++) {
                 if (i != excludeReg) {
@@ -248,24 +271,27 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
             }
         }
         
-        if (regIdx == -1) regIdx = 0; // Fallback
+        if (regIdx == -1) regIdx = 0;
         
-        // Clear register state - we're loading a variable, not tracking it as a temp
         regState[regIdx].tempNum = -1;
         regState[regIdx].isDirty = 0;
         
-        // Load variable from its actual memory location
         Symbol *s = lookup(op.val.varName);
         if (!s) return regIdx;
+        
+        // TYPE-AWARE LOAD
+        int load_op, store_op, imm_op;
+        get_load_store_opcodes(s->type, &load_op, &store_op, &imm_op);
+        const char *load_instr = get_load_mnemonic(s->type);
         
         const char *regName = get_reg_name(regIdx);
         
         char line[256];
-        snprintf(line, sizeof(line), "ld %s, %d(r0)\n", regName, s->memOffset);
+        snprintf(line, sizeof(line), "%s %s, %d(r0)\n", load_instr, regName, s->memOffset);
         strcat(output, line);
         
         int rt = get_register_number(regName);
-        uint32_t machine_code = encode_i_format(OPCODE_LD, 0, rt, (int16_t)s->memOffset);
+        uint32_t machine_code = encode_i_format(load_op, 0, rt, (int16_t)s->memOffset);
         
         char hex_str[32];
         sprintf(hex_str, "0x%08X\n", machine_code);
@@ -284,7 +310,6 @@ static int load_operand_ex(TACOperand op, TACInstr *current,
     return 0;
 }
 
-
 /* Load operand into register */
 static int load_operand(TACOperand op, TACInstr *current,
                        char *output, char *hex_out, char *bin_out,
@@ -300,6 +325,29 @@ static int find_temp_in_register(int tempNum) {
         }
     }
     return -1;
+}
+
+/* Helper function to get load/store opcodes based on type */
+static void get_load_store_opcodes(VarType type, int *load_opcode, int *store_opcode, int *imm_opcode) {
+    switch (type) {
+        case TYPE_CHR:
+            *load_opcode = OPCODE_LB;
+            *store_opcode = OPCODE_SB;
+            *imm_opcode = OPCODE_ADDIU;  // Use 32-bit immediate for consistency
+            break;
+        case TYPE_NMBR:
+            *load_opcode = OPCODE_LW;
+            *store_opcode = OPCODE_SW;
+            *imm_opcode = OPCODE_ADDIU;
+            break;
+        case TYPE_FLEX:
+        default:
+            // FLEX uses word operations by default
+            *load_opcode = OPCODE_LW;
+            *store_opcode = OPCODE_SW;
+            *imm_opcode = OPCODE_ADDIU;
+            break;
+    }
 }
 
 
@@ -719,13 +767,91 @@ static void optimize_simple_assignments(TACProgram *prog) {
     }
 }
 
+// static void optimize_constant_folding(TACProgram *prog) {
+//     TACInstr *curr = prog->head;
+    
+//     while (curr) {
+//         // Pattern: arithmetic operation with two constant operands
+//         if ((curr->op == TAC_ADD || curr->op == TAC_SUB || 
+//              curr->op == TAC_MUL || curr->op == TAC_DIV) &&
+//             curr->arg1.type == OPERAND_TEMP &&
+//             curr->arg2.type == OPERAND_TEMP) {
+            
+//             // Check if both temps come from LOAD_INT instructions
+//             TACInstr *load1 = NULL, *load2 = NULL;
+            
+//             for (TACInstr *check = prog->head; check != curr; check = check->next) {
+//                 if (check->op == TAC_LOAD_INT && check->result.type == OPERAND_TEMP) {
+//                     if (check->result.val.tempNum == curr->arg1.val.tempNum) {
+//                         load1 = check;
+//                     }
+//                     if (check->result.val.tempNum == curr->arg2.val.tempNum) {
+//                         load2 = check;
+//                     }
+//                 }
+//             }
+            
+//             // Only fold if both operands are from LOAD_INT with OPERAND_INT sources
+//             // AND the result of this operation is NOT used in another arithmetic operation
+//             if (load1 && load2 && 
+//                 load1->arg1.type == OPERAND_INT && 
+//                 load2->arg1.type == OPERAND_INT) {
+                
+//                 // Check if the RESULT of THIS arithmetic operation is used in another arithmetic op
+//                 int resultUsedInArithmetic = 0;
+                
+//                 if (curr->result.type == OPERAND_TEMP) {
+//                     for (TACInstr *check = curr->next; check; check = check->next) {
+//                         // If our result is used as an operand in another ADD/SUB/MUL/DIV
+//                         if ((check->op == TAC_ADD || check->op == TAC_SUB || 
+//                              check->op == TAC_MUL || check->op == TAC_DIV)) {
+//                             if ((check->arg1.type == OPERAND_TEMP && check->arg1.val.tempNum == curr->result.val.tempNum) ||
+//                                 (check->arg2.type == OPERAND_TEMP && check->arg2.val.tempNum == curr->result.val.tempNum)) {
+//                                 resultUsedInArithmetic = 1;
+//                                 break;
+//                             }
+//                         }
+//                     }
+//                 }
+                
+//                 // Only fold if the result is NOT used in another arithmetic operation
+//                 // This prevents: t0=1, t1=2, t2=3 -> t3=3, t4=6 (over-folding)
+//                 // But allows: t0=0, t1=5 -> t2=-5 (simple unary minus via 0-x)
+//                 if (!resultUsedInArithmetic) {
+//                     int val1 = load1->arg1.val.intVal;
+//                     int val2 = load2->arg1.val.intVal;
+//                     int result = 0;
+                    
+//                     switch (curr->op) {
+//                         case TAC_ADD: result = val1 + val2; break;
+//                         case TAC_SUB: result = val1 - val2; break;
+//                         case TAC_MUL: result = val1 * val2; break;
+//                         case TAC_DIV: 
+//                             if (val2 != 0) result = val1 / val2;
+//                             else goto skip_fold;
+//                             break;
+//                         default: goto skip_fold;
+//                     }
+                    
+//                     // Replace arithmetic op with direct load
+//                     curr->op = TAC_LOAD_INT;
+//                     curr->arg1 = tac_operand_int(result);
+//                     curr->arg2 = tac_operand_none();
+//                 }
+//             }
+//         }
+//         skip_fold:
+//         curr = curr->next;
+//     }
+// }
+
 static void optimize_constant_folding(TACProgram *prog) {
     TACInstr *curr = prog->head;
     
     while (curr) {
-        // Pattern: arithmetic operation with two constant operands
-        if ((curr->op == TAC_ADD || curr->op == TAC_SUB || 
-             curr->op == TAC_MUL || curr->op == TAC_DIV) &&
+        // VERY LIMITED constant folding: ONLY fold unary minus pattern (0 - x)
+        // Do NOT fold general arithmetic like (1 + 2) or (1 - 5)
+        if (curr->op == TAC_SUB &&  // Only subtraction
             curr->arg1.type == OPERAND_TEMP &&
             curr->arg2.type == OPERAND_TEMP) {
             
@@ -743,35 +869,22 @@ static void optimize_constant_folding(TACProgram *prog) {
                 }
             }
             
-            // If both are constant loads, fold them
+            // ONLY fold if it's the unary minus pattern: 0 - x
             if (load1 && load2 && 
                 load1->arg1.type == OPERAND_INT && 
-                load2->arg1.type == OPERAND_INT) {
+                load2->arg1.type == OPERAND_INT &&
+                load1->arg1.val.intVal == 0) {  // ← KEY: first operand must be 0
                 
-                int val1 = load1->arg1.val.intVal;
                 int val2 = load2->arg1.val.intVal;
-                int result = 0;
+                int result = 0 - val2;
                 
-                switch (curr->op) {
-                    case TAC_ADD: result = val1 + val2; break;
-                    case TAC_SUB: result = val1 - val2; break;
-                    case TAC_MUL: result = val1 * val2; break;
-                    case TAC_DIV: 
-                        if (val2 != 0) result = val1 / val2;
-                        else goto skip_fold;
-                        break;
-                    default: goto skip_fold;
-                }
-                
-                // Replace arithmetic op with direct load
+                // Replace subtraction with direct load of negative value
                 curr->op = TAC_LOAD_INT;
                 curr->arg1 = tac_operand_int(result);
                 curr->arg2 = tac_operand_none();
-                
-            
             }
         }
-        skip_fold:
+        
         curr = curr->next;
     }
 }
@@ -1343,17 +1456,20 @@ void tac_generate_assembly(TACProgram *prog) {
         switch (instr->op) {
             case TAC_LOAD_INT: {
                 if (instr->result.type == OPERAND_VAR) {
-                    // Load directly to variable in memory
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
-                        // **FIX: Handle negative immediates properly**
                         int immediate = instr->arg1.val.intVal;
                         
-                        snprintf(asm_line, sizeof(asm_line), "daddiu r2, r0, %d\n", immediate);
+                        // TYPE-AWARE immediate load
+                        int load_op, store_op, imm_op;
+                        get_load_store_opcodes(s->type, &load_op, &store_op, &imm_op);
+                        const char *imm_instr = get_imm_mnemonic(s->type);
+                        const char *store_instr = get_store_mnemonic(s->type);
+                        
+                        snprintf(asm_line, sizeof(asm_line), "%s r2, r0, %d\n", imm_instr, immediate);
                         strcat(assembly_output, asm_line);
                         
-                        // Cast to int16_t to properly handle negative values in encoding
-                        uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, 2, (int16_t)immediate);
+                        uint32_t mc = encode_i_format(imm_op, 0, 2, (int16_t)immediate);
                         char hex_str[32];
                         sprintf(hex_str, "0x%08X\n", mc);
                         strcat(hex_output, hex_str);
@@ -1365,10 +1481,11 @@ void tac_generate_assembly(TACProgram *prog) {
                         strcat(binary_output, bin_str);
                         strcat(binary_output, "\n");
                         
-                        snprintf(asm_line, sizeof(asm_line), "sd r2, %d(r0)\n", s->memOffset);
+                        // TYPE-AWARE store
+                        snprintf(asm_line, sizeof(asm_line), "%s r2, %d(r0)\n", store_instr, s->memOffset);
                         strcat(assembly_output, asm_line);
                         
-                        mc = encode_i_format(OPCODE_SD, 0, 2, (int16_t)s->memOffset);
+                        mc = encode_i_format(store_op, 0, 2, (int16_t)s->memOffset);
                         sprintf(hex_str, "0x%08X\n", mc);
                         strcat(hex_output, hex_str);
                         
@@ -1379,21 +1496,19 @@ void tac_generate_assembly(TACProgram *prog) {
                         strcat(binary_output, "\n");
                     }
                 } else if (instr->result.type == OPERAND_TEMP) {
-                    // Load immediate into register
+                    // Temp storage - use word operations
                     int regIdx = allocate_register_for_temp(instr, instr->result.val.tempNum, 
                                                         assembly_output, hex_output, binary_output, 
                                                         tempStorageOffset);
                     const char *regName = get_reg_name(regIdx);
                     
-                    // **FIX: Handle negative immediates properly**
                     int immediate = instr->arg1.val.intVal;
                     
                     snprintf(asm_line, sizeof(asm_line), "daddiu %s, r0, %d\n", regName, immediate);
                     strcat(assembly_output, asm_line);
                     
                     int rt = get_register_number(regName);
-                    // Cast to int16_t to properly handle negative values in encoding
-                    uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)immediate);
+                    uint32_t mc = encode_i_format(OPCODE_ADDIU, 0, rt, (int16_t)immediate);
                     
                     char hex_str[32];
                     sprintf(hex_str, "0x%08X\n", mc);
@@ -1407,11 +1522,6 @@ void tac_generate_assembly(TACProgram *prog) {
                     strcat(binary_output, "\n");
                     
                     regState[regIdx].isDirty = 1;
-                    
-                    // Only store if this temp is used later or if it's the last instruction
-                    if (!temp_is_used_later(instr, instr->result.val.tempNum) || !instr->next) {
-                        // Will be stored at end if needed
-                    }
                 }
                 break;
             }
@@ -1573,17 +1683,28 @@ void tac_generate_assembly(TACProgram *prog) {
                 // Mark result as dirty
                 regState[destReg].isDirty = 1;
                 
-                // ALWAYS store result if it's a variable
+                // ALWAYS store result if it's a variable - WITH TYPE-AWARE OPERATIONS
                 if (instr->result.type == OPERAND_VAR) {
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
-                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", destRegName, s->memOffset);
+                        const char *destRegName = get_reg_name(destReg);
+                        
+                        // TYPE-AWARE store operation
+                        int load_op, store_op, imm_op;
+                        get_load_store_opcodes(s->type, &load_op, &store_op, &imm_op);
+                        const char *store_instr = get_store_mnemonic(s->type);
+                        
+                        snprintf(asm_line, sizeof(asm_line), "%s %s, %d(r0)\n", store_instr, destRegName, s->memOffset);
                         strcat(assembly_output, asm_line);
                         
-                        mc = encode_i_format(OPCODE_SD, 0, rd, (int16_t)s->memOffset);
+                        int rd = get_register_number(destRegName);
+                        uint32_t mc = encode_i_format(store_op, 0, rd, (int16_t)s->memOffset);
+                        
+                        char hex_str[32];
                         sprintf(hex_str, "0x%08X\n", mc);
                         strcat(hex_output, hex_str);
                         
+                        char bin_str[40];
                         for (int i = 31; i >= 0; i--) {
                             sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
                         }
@@ -1593,8 +1714,8 @@ void tac_generate_assembly(TACProgram *prog) {
                         regState[destReg].isDirty = 0; // No longer dirty after storing
                     }
                 }
-                
-                break;
+
+                break;  // End of arithmetic case
             }
             
             case TAC_COPY: {
@@ -1606,12 +1727,18 @@ void tac_generate_assembly(TACProgram *prog) {
                         if (s) {
                             int immediate = instr->arg1.val.intVal;
                             
+                            // TYPE-AWARE immediate load and store
+                            int load_op, store_op, imm_op;
+                            get_load_store_opcodes(s->type, &load_op, &store_op, &imm_op);
+                            const char *imm_instr = get_imm_mnemonic(s->type);
+                            const char *store_instr = get_store_mnemonic(s->type);
+                            
                             // Load immediate into r2
-                            snprintf(asm_line, sizeof(asm_line), "daddiu r2, r0, %d\n", immediate);
+                            snprintf(asm_line, sizeof(asm_line), "%s r2, r0, %d\n", imm_instr, immediate);
                             strcat(assembly_output, asm_line);
                             
                             int rt = 2;
-                            uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)immediate);
+                            uint32_t mc = encode_i_format(imm_op, 0, rt, (int16_t)immediate);
                             
                             char hex_str[32];
                             sprintf(hex_str, "0x%08X\n", mc);
@@ -1624,11 +1751,11 @@ void tac_generate_assembly(TACProgram *prog) {
                             strcat(binary_output, bin_str);
                             strcat(binary_output, "\n");
                             
-                            // Store to variable
-                            snprintf(asm_line, sizeof(asm_line), "sd r2, %d(r0)\n", s->memOffset);
+                            // TYPE-AWARE store to variable
+                            snprintf(asm_line, sizeof(asm_line), "%s r2, %d(r0)\n", store_instr, s->memOffset);
                             strcat(assembly_output, asm_line);
                             
-                            mc = encode_i_format(OPCODE_SD, 0, rt, (int16_t)s->memOffset);
+                            mc = encode_i_format(store_op, 0, rt, (int16_t)s->memOffset);
                             sprintf(hex_str, "0x%08X\n", mc);
                             strcat(hex_output, hex_str);
                             
@@ -1639,7 +1766,7 @@ void tac_generate_assembly(TACProgram *prog) {
                             strcat(binary_output, "\n");
                         }
                     }
-                    break;
+                    break;  // Important: break here to avoid falling through
                 }
                 
                 // Original code for copying from temp/variable
@@ -1649,11 +1776,17 @@ void tac_generate_assembly(TACProgram *prog) {
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
                         const char *regName = get_reg_name(srcReg);
-                        snprintf(asm_line, sizeof(asm_line), "sd %s, %d(r0)\n", regName, s->memOffset);
+                        
+                        // TYPE-AWARE store
+                        int load_op, store_op, imm_op;
+                        get_load_store_opcodes(s->type, &load_op, &store_op, &imm_op);
+                        const char *store_instr = get_store_mnemonic(s->type);
+                        
+                        snprintf(asm_line, sizeof(asm_line), "%s %s, %d(r0)\n", store_instr, regName, s->memOffset);
                         strcat(assembly_output, asm_line);
                         
                         int rt = get_register_number(regName);
-                        uint32_t mc = encode_i_format(OPCODE_SD, 0, rt, (int16_t)s->memOffset);
+                        uint32_t mc = encode_i_format(store_op, 0, rt, (int16_t)s->memOffset);
                         
                         char hex_str[32];
                         sprintf(hex_str, "0x%08X\n", mc);

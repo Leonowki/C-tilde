@@ -1695,7 +1695,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 217 "parser.y"
     {
-          
+
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MINUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
@@ -1704,7 +1704,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 221 "parser.y"
     {
-           
+
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MULT_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
@@ -1713,7 +1713,7 @@ yyreduce:
 /* Line 1792 of yacc.c  */
 #line 225 "parser.y"
     {
-           
+
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_DIV_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
@@ -2142,7 +2142,7 @@ int main(int argc, char **argv) {
     
     if (DEBUG_MODE) ast_print(root, 0);
 
-    // BUILD SYMBOL TABLE FIRST - before semantic analysis
+    //before semantic analysis, build symbol table for right sequence
     if (DEBUG_MODE) printf("\n=== Building Symbol Table ===\n");
     ast_build_symbol_table(root, &error_count);
     if (error_count > 0) {
@@ -2152,7 +2152,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    // semantic analysis (which checks for undefined variables)
+    // semantic analysis 
     int sem_result = Semantic_analysis();
     if(sem_result != 0){
         printf("\",\n");
@@ -2182,4 +2182,6 @@ int main(int argc, char **argv) {
     ast_free(root);
 
     return 0;
+
+
 }
