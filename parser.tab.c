@@ -84,7 +84,7 @@ extern int yychar;
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
-bool DEBUG_MODE = false;
+bool DEBUG_MODE = true;
 
 VarType current_decl_type;
 

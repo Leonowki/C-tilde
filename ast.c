@@ -193,7 +193,6 @@ void ast_print(ASTNode *node, int indent) {
             ast_print(node->data.decl.initExpr, indent + 1);
             break;
         case NODE_DECL_LIST:
-            /* FIX: Removed duplicate print_indent call */
             printf("DeclList (line %d)\n", node->line);
             ast_print(node->data.declList.left, indent + 1);
             ast_print(node->data.declList.right, indent + 1);
@@ -215,10 +214,27 @@ void ast_print(ASTNode *node, int indent) {
             ast_print(node->data.shw.left, indent + 1);
             ast_print(node->data.shw.right, indent + 1);
             break;
+        // ADD THESE MISSING CASES:
+        case NODE_TYPE_DECL_LIST:
+            printf("TypeDeclList(%s)\n", type_to_string(node->data.typeDeclList.varType));
+            ast_print(node->data.typeDeclList.nameList, indent + 1);
+            break;
+        case NODE_NAME_LIST:
+            printf("NameList\n");
+            ast_print(node->data.nameList.left, indent + 1);
+            ast_print(node->data.nameList.right, indent + 1);
+            break;
+        case NODE_NAME_ITEM:
+            printf("NameItem(%s)\n", node->data.nameItem.name);
+            if (node->data.nameItem.initExpr) {
+                ast_print(node->data.nameItem.initExpr, indent + 1);
+            }
+            break;
         default:
             printf("Unknown node type %d\n", node->type);
     }
 }
+
 /*CHECK SEMANTICS FOR COMMON SEMANTIC ERRORS*/
 static int is_constant_zero(ASTNode *node) {
     if (!node) return 0;

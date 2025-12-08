@@ -571,6 +571,17 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
                 if (val.isCharType) {
                     instr->arg1.isCharType = 1;  // Mark the source operand
                 }
+            } else {
+                // ADD: Generate default initialization for uninitialized declarations
+                TACOperand defaultVal;
+                if (node->data.decl.varType == TYPE_NMBR) {
+                    defaultVal = tac_operand_int(0);
+                } else if (node->data.decl.varType == TYPE_CHR) {
+                    defaultVal = tac_operand_int('\0');
+                } else {
+                    defaultVal = tac_operand_str("");
+                }
+                tac_emit(prog, TAC_COPY, tac_operand_var(node->data.decl.varName), defaultVal, tac_operand_none(), node->line);
             }
             break;
         }
@@ -597,9 +608,26 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
             const char *name = node->data.nameItem.name;
             ASTNode *init = node->data.nameItem.initExpr;
             
+            Symbol *s = lookup(name);
+            if (!s) break; // Symbol should already exist
+            
             if (init) {
                 TACOperand val = tac_gen_expr(prog, init);
-                tac_emit(prog, TAC_COPY, tac_operand_var(name), val, tac_operand_none(), node->line);
+                TACInstr *instr = tac_emit(prog, TAC_COPY, tac_operand_var(name), val, tac_operand_none(), node->line);
+                if (val.isCharType) {
+                    instr->arg1.isCharType = 1;
+                }
+            } else {
+                // Generate default initialization based on symbol type
+                TACOperand defaultVal;
+                if (s->type == TYPE_NMBR) {
+                    defaultVal = tac_operand_int(0);
+                } else if (s->type == TYPE_CHR) {
+                    defaultVal = tac_operand_int('\0');
+                } else {
+                    defaultVal = tac_operand_str("");
+                }
+                tac_emit(prog, TAC_COPY, tac_operand_var(name), defaultVal, tac_operand_none(), node->line);
             }
             break;
         }
@@ -644,7 +672,6 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
             break;
     }
 }
-
 
 //Optimizer
 static void optimize_simple_assignments(TACProgram *prog) {
@@ -1571,7 +1598,51 @@ void tac_generate_assembly(TACProgram *prog) {
             }
             
             case TAC_COPY: {
-                // Similar pattern - load source, store to destination
+                // Check if source is an immediate value
+                if (instr->arg1.type == OPERAND_INT) {
+                    // Direct copy of immediate to variable
+                    if (instr->result.type == OPERAND_VAR) {
+                        Symbol *s = lookup(instr->result.val.varName);
+                        if (s) {
+                            int immediate = instr->arg1.val.intVal;
+                            
+                            // Load immediate into r2
+                            snprintf(asm_line, sizeof(asm_line), "daddiu r2, r0, %d\n", immediate);
+                            strcat(assembly_output, asm_line);
+                            
+                            int rt = 2;
+                            uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)immediate);
+                            
+                            char hex_str[32];
+                            sprintf(hex_str, "0x%08X\n", mc);
+                            strcat(hex_output, hex_str);
+                            
+                            char bin_str[40];
+                            for (int i = 31; i >= 0; i--) {
+                                sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                            }
+                            strcat(binary_output, bin_str);
+                            strcat(binary_output, "\n");
+                            
+                            // Store to variable
+                            snprintf(asm_line, sizeof(asm_line), "sd r2, %d(r0)\n", s->memOffset);
+                            strcat(assembly_output, asm_line);
+                            
+                            mc = encode_i_format(OPCODE_SD, 0, rt, (int16_t)s->memOffset);
+                            sprintf(hex_str, "0x%08X\n", mc);
+                            strcat(hex_output, hex_str);
+                            
+                            for (int i = 31; i >= 0; i--) {
+                                sprintf(bin_str + (31 - i), "%d", (mc >> i) & 1);
+                            }
+                            strcat(binary_output, bin_str);
+                            strcat(binary_output, "\n");
+                        }
+                    }
+                    break;
+                }
+                
+                // Original code for copying from temp/variable
                 int srcReg = load_operand(instr->arg1, instr, assembly_output, hex_output, binary_output, tempStorageOffset);
                 
                 if (instr->result.type == OPERAND_VAR) {

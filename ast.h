@@ -20,9 +20,9 @@ typedef enum {
     NODE_COMPOUND_ASSIGN,
     NODE_SHW,
     NODE_CONCAT,
-    NODE_TYPE_DECL_LIST,
-    NODE_NAME_LIST,
-    NODE_NAME_ITEM,
+    NODE_TYPE_DECL_LIST,  
+    NODE_NAME_LIST,       
+    NODE_NAME_ITEM         
 } NodeType;
 
 typedef enum {
