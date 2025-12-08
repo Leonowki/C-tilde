@@ -251,7 +251,7 @@ static int check_expr_semantics(ASTNode *node, int *error_count) {
             /* Variable is already checked during parsing */
             Symbol *s = lookup(node->data.strVal);
             if (!s) {
-                fprintf(stderr, "LINE %d: Undefined variable '%s'\n", 
+                fprintf(stderr, "error at %d: Undefined variable '%s'\n", 
                         node->line, node->data.strVal);
                 (*error_count)++;
                 return 0;
@@ -269,7 +269,7 @@ static int check_expr_semantics(ASTNode *node, int *error_count) {
             /* Check for division by zero */
             if (node->data.binop.op == OP_DIV) {
                 if (is_constant_zero(node->data.binop.right)) {
-                    fprintf(stderr, "LINE %d: Division by zero detected\n", node->line);
+                    fprintf(stderr, "error %d: Division by zero detected\n", node->line);
                     (*error_count)++;
                     return 0;
                 }

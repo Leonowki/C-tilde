@@ -586,6 +586,23 @@ void tac_gen_stmt(TACProgram *prog, ASTNode *node) {
                              node->data.typeDeclList.nameList, node->line);
             break;
         }
+
+        case NODE_NAME_LIST: {
+            tac_gen_stmt(prog, node->data.nameList.left);
+            tac_gen_stmt(prog, node->data.nameList.right);
+            break;
+        }
+
+        case NODE_NAME_ITEM: {
+            const char *name = node->data.nameItem.name;
+            ASTNode *init = node->data.nameItem.initExpr;
+            
+            if (init) {
+                TACOperand val = tac_gen_expr(prog, init);
+                tac_emit(prog, TAC_COPY, tac_operand_var(name), val, tac_operand_none(), node->line);
+            }
+            break;
+        }
         
         case NODE_ASSIGN: {
             TACOperand val = tac_gen_expr(prog, node->data.assign.expr);
@@ -943,12 +960,24 @@ int tac_execute(TACProgram *prog) {
             case TAC_LOAD_INT: {
                 int value = get_operand_value(instr->arg1, tempValues);
                 
-                // **FIX: Check if this is a character being loaded into a variable**
-                if (instr->result.type == OPERAND_VAR && 
-                    (instr->resultIsChar || instr->arg1.isCharType)) {
+                // FIX: Handle type conversion on load
+                if (instr->result.type == OPERAND_VAR) {
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
-                        set_char(s, (char)value);
+                        // If loading char into nmbr, convert to ASCII
+                        if (s->type == TYPE_NMBR && (instr->resultIsChar || instr->arg1.isCharType)) {
+                            set_number(s, value);  // Store as ASCII number
+                        }
+                        // If destination is char type
+                        else if (s->type == TYPE_CHR && (instr->resultIsChar || instr->arg1.isCharType)) {
+                            set_char(s, (char)value);
+                        }
+                        // Default behavior
+                        else if (s->type == TYPE_CHR) {
+                            set_char(s, (char)value);
+                        } else {
+                            set_number(s, value);
+                        }
                     }
                 } else {
                     set_operand_value(instr->result, value, tempValues);
@@ -957,8 +986,7 @@ int tac_execute(TACProgram *prog) {
             }
             
             case TAC_LOAD_STR: {
-                // For strings, we don't store them in tempValues
-                // They'll be retrieved directly from the instruction when needed
+                // For strings, no processing needed here
                 break;
             }
             
@@ -998,11 +1026,36 @@ int tac_execute(TACProgram *prog) {
             case TAC_COPY: {
                 int value = get_operand_value(instr->arg1, tempValues);
                 
-                // **FIX: Preserve character type information**
-                if (instr->result.type == OPERAND_VAR && instr->arg1.isCharType) {
-                    Symbol *s = lookup(instr->result.val.varName);
-                    if (s) {
-                        set_char(s, (char)value);
+                //Handle chr to nmbr conversion
+                if (instr->result.type == OPERAND_VAR) {
+                    Symbol *destSym = lookup(instr->result.val.varName);
+                    if (destSym) {
+                        // Check if source is char type
+                        int sourceIsChar = 0;
+                        if (instr->arg1.type == OPERAND_VAR) {
+                            Symbol *srcSym = lookup(instr->arg1.val.varName);
+                            if (srcSym && (srcSym->type == TYPE_CHR || 
+                                (srcSym->type == TYPE_FLEX && srcSym->flexType == FLEX_CHAR))) {
+                                sourceIsChar = 1;
+                            }
+                        } else if (instr->arg1.isCharType) {
+                            sourceIsChar = 1;
+                        }
+                        
+                        // If destination is nmbr and source is char, convert to ASCII
+                        if (destSym->type == TYPE_NMBR && sourceIsChar) {
+                            set_number(destSym, value);  // Store ASCII value as number
+                        }
+                        // If destination is char and source provides char info
+                        else if (destSym->type == TYPE_CHR && sourceIsChar) {
+                            set_char(destSym, (char)value);
+                        }
+                        // Otherwise use appropriate setter
+                        else if (destSym->type == TYPE_CHR) {
+                            set_char(destSym, (char)value);
+                        } else {
+                            set_number(destSym, value);
+                        }
                     }
                 } else {
                     set_operand_value(instr->result, value, tempValues);

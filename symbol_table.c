@@ -63,7 +63,7 @@ void set_number(Symbol *s, int value) {
         s->strVal = NULL;
     }
     
-    /* For chr type, store as character */
+    /* For chr type, store both representations */
     if (s->type == TYPE_CHR) {
         s->chrVal = (char)value;
         s->numVal = value;
