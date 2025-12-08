@@ -18,7 +18,7 @@ extern int yychar;
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
-bool DEBUG_MODE = true;
+bool DEBUG_MODE = false;
 
 VarType current_decl_type;
 
@@ -140,97 +140,60 @@ declaration:
 single_decl:
         TOK_NMBR TOK_IDENTIFIER TOK_ASSIGN expr {
             current_decl_type = TYPE_NMBR;
-            Symbol *s = insert($2, TYPE_NMBR, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                $$ = ast_create_decl(TYPE_NMBR, $2, $4, lineCount);
-            }
+            $$ = ast_create_decl(TYPE_NMBR, $2, $4, lineCount);
+           
         }
         | TOK_NMBR TOK_IDENTIFIER {
             current_decl_type = TYPE_NMBR;
-            Symbol *s = insert($2, TYPE_NMBR, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                ASTNode *init = ast_create_num_lit(0, lineCount);
-                $$ = ast_create_decl(TYPE_NMBR, $2, init, lineCount);
-            }
+            ASTNode *init = ast_create_num_lit(0, lineCount);
+            $$ = ast_create_decl(TYPE_NMBR, $2, init, lineCount);
+            
         }
         | TOK_CHR TOK_IDENTIFIER TOK_ASSIGN expr {
             current_decl_type = TYPE_CHR;
-            Symbol *s = insert($2, TYPE_CHR, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                $$ = ast_create_decl(TYPE_CHR, $2, $4, lineCount);
-            }
+            $$ = ast_create_decl(TYPE_CHR, $2, $4, lineCount);
+            
         }
         | TOK_CHR TOK_IDENTIFIER {
             current_decl_type = TYPE_CHR;
-            Symbol *s = insert($2, TYPE_CHR, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                ASTNode *init = ast_create_chr_lit('\0', lineCount);
-                $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
-            }
+            ASTNode *init = ast_create_chr_lit('\0', lineCount);
+            $$ = ast_create_decl(TYPE_CHR, $2, init, lineCount);
+
         }
         | TOK_FLEX TOK_IDENTIFIER TOK_ASSIGN expr {
             current_decl_type = TYPE_FLEX;
-            Symbol *s = insert($2, TYPE_FLEX, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                $$ = ast_create_decl(TYPE_FLEX, $2, $4, lineCount);
-            }
+            $$ = ast_create_decl(TYPE_FLEX, $2, $4, lineCount);
         }
         | TOK_FLEX TOK_IDENTIFIER {
             current_decl_type = TYPE_FLEX;
-            Symbol *s = insert($2, TYPE_FLEX, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
-            } else {
-                ASTNode *init = ast_create_str_lit("", lineCount);
-                $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
-            }
+    
+            ASTNode *init = ast_create_str_lit("", lineCount);
+            $$ = ast_create_decl(TYPE_FLEX, $2, init, lineCount);
+            
         }
         ;
 
 /* Continuation after first declaration - determines format */
 decl_continuation:
-        /* No continuation - single declaration */
         /* empty */ { 
             $$ = NULL; 
         }
-        /* Format 1: Same type continuation (nmbr a, b, c) */
         | TOK_COMMA TOK_IDENTIFIER decl_continuation {
-            Symbol *s = insert($2, current_decl_type, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
+            ASTNode *item = ast_create_name_item_typed($2, NULL, current_decl_type, lineCount);
+            if ($3 == NULL) {
+                $$ = item;
             } else {
-                ASTNode *item = ast_create_name_item($2, NULL, lineCount);
-                if ($3 == NULL) {
-                    $$ = item;
-                } else {
-                    $$ = ast_create_name_list(item, $3, lineCount);
-                }
+                $$ = ast_create_name_list(item, $3, lineCount);
             }
         }
         | TOK_COMMA TOK_IDENTIFIER TOK_ASSIGN expr decl_continuation {
-            Symbol *s = insert($2, current_decl_type, lineCount, &error_count);
-            if (!s) {
-                $$ = NULL;
+            ASTNode *item = ast_create_name_item_typed($2, $4, current_decl_type, lineCount);
+            if ($5 == NULL) {
+                $$ = item;
             } else {
-                ASTNode *item = ast_create_name_item($2, $4, lineCount);
-                if ($5 == NULL) {
-                    $$ = item;
-                } else {
-                    $$ = ast_create_name_list(item, $5, lineCount);
-                }
+                $$ = ast_create_name_list(item, $5, lineCount);
             }
         }
-        /* Format 2: Different type continuation (nmbr a, chr b) */
         | TOK_COMMA single_decl decl_continuation {
             if ($3 == NULL) {
                 $$ = $2;
@@ -242,46 +205,25 @@ decl_continuation:
 
 assignment:
         TOK_IDENTIFIER TOK_ASSIGN expr {
-            Symbol *s = lookup($1);
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n ", lineCount, $1);
-            }
             $$ = ast_create_assign($1, $3, lineCount);
         }
         ;
 
 compound_assign:
         TOK_IDENTIFIER TOK_PLUS_ASSIGN expr {
-            Symbol *s = lookup($1);
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
-            }
+            
             $$ = ast_create_compound_assign($1, OP_PLUS_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_MINUS_ASSIGN expr {
-            Symbol *s = lookup($1);
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
-            }
+          
             $$ = ast_create_compound_assign($1, OP_MINUS_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_MULT_ASSIGN expr {
-            Symbol *s = lookup($1);
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
-            }
+           
             $$ = ast_create_compound_assign($1, OP_MULT_ASSIGN, $3, lineCount);
         }
         | TOK_IDENTIFIER TOK_DIV_ASSIGN expr {
-            Symbol *s = lookup($1);
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, $1);
-            }
+           
             $$ = ast_create_compound_assign($1, OP_DIV_ASSIGN, $3, lineCount);
         }
         ;
@@ -320,14 +262,7 @@ factor:
         TOK_NUMBER_LITERAL        { $$ = ast_create_num_lit($1, lineCount); }
         | TOK_CHAR_LITERAL        { $$ = ast_create_chr_lit($1, lineCount); }
         | TOK_IDENTIFIER          { 
-            Symbol *s = lookup($1);
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "\nError at line %d: Undefined variable '%s'\n", lineCount, $1);
-                $$ = NULL;
-            } else {
                 $$ = ast_create_ident($1, lineCount);
-            }
         }
         | TOK_LPAREN expr TOK_RPAREN { $$ = $2; }
         | TOK_MINUS factor        {
@@ -342,7 +277,6 @@ factor:
             $$ = $2;
         }
         ;
-
 %%
 
 void yyerror(const char *s) {
@@ -415,6 +349,17 @@ int main(int argc, char **argv) {
     
     if (DEBUG_MODE) ast_print(root, 0);
 
+    // BUILD SYMBOL TABLE FIRST - before semantic analysis
+    if (DEBUG_MODE) printf("\n=== Building Symbol Table ===\n");
+    ast_build_symbol_table(root, &error_count);
+    if (error_count > 0) {
+        if (DEBUG_MODE) printf("Symbol table construction failed with %d error(s).\n", error_count);
+        printf("\",\n");
+        ast_free(root);
+        return 1;
+    }
+
+    // semantic analysis (which checks for undefined variables)
     int sem_result = Semantic_analysis();
     if(sem_result != 0){
         printf("\",\n");

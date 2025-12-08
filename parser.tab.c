@@ -84,7 +84,7 @@ extern int yychar;
 int lineCount = 1;
 ASTNode *root = NULL;
 int error_count = 0;
-bool DEBUG_MODE = true;
+bool DEBUG_MODE = false;
 
 VarType current_decl_type;
 
@@ -501,10 +501,10 @@ static const yytype_int8 yyrhs[] =
 static const yytype_uint16 yyrline[] =
 {
        0,    76,    76,    80,    84,    89,    96,   104,   114,   115,
-     116,   120,   121,   122,   123,   128,   141,   150,   160,   169,
-     179,   188,   203,   207,   220,   234,   244,   255,   263,   271,
-     279,   290,   296,   297,   303,   304,   308,   309,   310,   314,
-     315,   316,   320,   321,   322,   332,   333,   341
+     116,   120,   121,   122,   123,   128,   141,   146,   152,   157,
+     163,   167,   178,   181,   189,   197,   207,   213,   217,   221,
+     225,   232,   238,   239,   245,   246,   250,   251,   252,   256,
+     257,   258,   262,   263,   264,   267,   268,   276
 };
 #endif
 
@@ -1570,91 +1570,67 @@ yyreduce:
 #line 141 "parser.y"
     {
             current_decl_type = TYPE_NMBR;
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_NMBR, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
-            } else {
-                (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
-            }
+            (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
+           
         }
     break;
 
   case 17:
 /* Line 1792 of yacc.c  */
-#line 150 "parser.y"
+#line 146 "parser.y"
     {
             current_decl_type = TYPE_NMBR;
-            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_NMBR, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
-            } else {
-                ASTNode *init = ast_create_num_lit(0, lineCount);
-                (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (2)].str), init, lineCount);
-            }
+            ASTNode *init = ast_create_num_lit(0, lineCount);
+            (yyval.node) = ast_create_decl(TYPE_NMBR, (yyvsp[(2) - (2)].str), init, lineCount);
+            
         }
     break;
 
   case 18:
 /* Line 1792 of yacc.c  */
-#line 160 "parser.y"
+#line 152 "parser.y"
     {
             current_decl_type = TYPE_CHR;
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_CHR, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
-            } else {
-                (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
-            }
+            (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
+            
         }
     break;
 
   case 19:
 /* Line 1792 of yacc.c  */
-#line 169 "parser.y"
+#line 157 "parser.y"
     {
             current_decl_type = TYPE_CHR;
-            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_CHR, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
-            } else {
-                ASTNode *init = ast_create_chr_lit('\0', lineCount);
-                (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (2)].str), init, lineCount);
-            }
+            ASTNode *init = ast_create_chr_lit('\0', lineCount);
+            (yyval.node) = ast_create_decl(TYPE_CHR, (yyvsp[(2) - (2)].str), init, lineCount);
+
         }
     break;
 
   case 20:
 /* Line 1792 of yacc.c  */
-#line 179 "parser.y"
+#line 163 "parser.y"
     {
             current_decl_type = TYPE_FLEX;
-            Symbol *s = insert((yyvsp[(2) - (4)].str), TYPE_FLEX, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
-            } else {
-                (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
-            }
+            (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (4)].str), (yyvsp[(4) - (4)].node), lineCount);
         }
     break;
 
   case 21:
 /* Line 1792 of yacc.c  */
-#line 188 "parser.y"
+#line 167 "parser.y"
     {
             current_decl_type = TYPE_FLEX;
-            Symbol *s = insert((yyvsp[(2) - (2)].str), TYPE_FLEX, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
-            } else {
-                ASTNode *init = ast_create_str_lit("", lineCount);
-                (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (2)].str), init, lineCount);
-            }
+    
+            ASTNode *init = ast_create_str_lit("", lineCount);
+            (yyval.node) = ast_create_decl(TYPE_FLEX, (yyvsp[(2) - (2)].str), init, lineCount);
+            
         }
     break;
 
   case 22:
 /* Line 1792 of yacc.c  */
-#line 203 "parser.y"
+#line 178 "parser.y"
     { 
             (yyval.node) = NULL; 
         }
@@ -1662,43 +1638,33 @@ yyreduce:
 
   case 23:
 /* Line 1792 of yacc.c  */
-#line 207 "parser.y"
+#line 181 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (3)].str), current_decl_type, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
+            ASTNode *item = ast_create_name_item_typed((yyvsp[(2) - (3)].str), NULL, current_decl_type, lineCount);
+            if ((yyvsp[(3) - (3)].node) == NULL) {
+                (yyval.node) = item;
             } else {
-                ASTNode *item = ast_create_name_item((yyvsp[(2) - (3)].str), NULL, lineCount);
-                if ((yyvsp[(3) - (3)].node) == NULL) {
-                    (yyval.node) = item;
-                } else {
-                    (yyval.node) = ast_create_name_list(item, (yyvsp[(3) - (3)].node), lineCount);
-                }
+                (yyval.node) = ast_create_name_list(item, (yyvsp[(3) - (3)].node), lineCount);
             }
         }
     break;
 
   case 24:
 /* Line 1792 of yacc.c  */
-#line 220 "parser.y"
+#line 189 "parser.y"
     {
-            Symbol *s = insert((yyvsp[(2) - (5)].str), current_decl_type, lineCount, &error_count);
-            if (!s) {
-                (yyval.node) = NULL;
+            ASTNode *item = ast_create_name_item_typed((yyvsp[(2) - (5)].str), (yyvsp[(4) - (5)].node), current_decl_type, lineCount);
+            if ((yyvsp[(5) - (5)].node) == NULL) {
+                (yyval.node) = item;
             } else {
-                ASTNode *item = ast_create_name_item((yyvsp[(2) - (5)].str), (yyvsp[(4) - (5)].node), lineCount);
-                if ((yyvsp[(5) - (5)].node) == NULL) {
-                    (yyval.node) = item;
-                } else {
-                    (yyval.node) = ast_create_name_list(item, (yyvsp[(5) - (5)].node), lineCount);
-                }
+                (yyval.node) = ast_create_name_list(item, (yyvsp[(5) - (5)].node), lineCount);
             }
         }
     break;
 
   case 25:
 /* Line 1792 of yacc.c  */
-#line 234 "parser.y"
+#line 197 "parser.y"
     {
             if ((yyvsp[(3) - (3)].node) == NULL) {
                 (yyval.node) = (yyvsp[(2) - (3)].node);
@@ -1710,72 +1676,51 @@ yyreduce:
 
   case 26:
 /* Line 1792 of yacc.c  */
-#line 244 "parser.y"
+#line 207 "parser.y"
     {
-            Symbol *s = lookup((yyvsp[(1) - (3)].str));
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n ", lineCount, (yyvsp[(1) - (3)].str));
-            }
             (yyval.node) = ast_create_assign((yyvsp[(1) - (3)].str), (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
 
   case 27:
 /* Line 1792 of yacc.c  */
-#line 255 "parser.y"
+#line 213 "parser.y"
     {
-            Symbol *s = lookup((yyvsp[(1) - (3)].str));
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
-            }
+            
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_PLUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
 
   case 28:
 /* Line 1792 of yacc.c  */
-#line 263 "parser.y"
+#line 217 "parser.y"
     {
-            Symbol *s = lookup((yyvsp[(1) - (3)].str));
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
-            }
+          
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MINUS_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
 
   case 29:
 /* Line 1792 of yacc.c  */
-#line 271 "parser.y"
+#line 221 "parser.y"
     {
-            Symbol *s = lookup((yyvsp[(1) - (3)].str));
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
-            }
+           
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_MULT_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
 
   case 30:
 /* Line 1792 of yacc.c  */
-#line 279 "parser.y"
+#line 225 "parser.y"
     {
-            Symbol *s = lookup((yyvsp[(1) - (3)].str));
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "Error at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (3)].str));
-            }
+           
             (yyval.node) = ast_create_compound_assign((yyvsp[(1) - (3)].str), OP_DIV_ASSIGN, (yyvsp[(3) - (3)].node), lineCount);
         }
     break;
 
   case 31:
 /* Line 1792 of yacc.c  */
-#line 290 "parser.y"
+#line 232 "parser.y"
     {
             (yyval.node) = ast_create_shw((yyvsp[(2) - (2)].node), lineCount);
         }
@@ -1783,13 +1728,13 @@ yyreduce:
 
   case 32:
 /* Line 1792 of yacc.c  */
-#line 296 "parser.y"
+#line 238 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 33:
 /* Line 1792 of yacc.c  */
-#line 297 "parser.y"
+#line 239 "parser.y"
     {
             (yyval.node) = ast_create_concat((yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount);
         }
@@ -1797,88 +1742,81 @@ yyreduce:
 
   case 34:
 /* Line 1792 of yacc.c  */
-#line 303 "parser.y"
+#line 245 "parser.y"
     { (yyval.node) = ast_create_str_lit((yyvsp[(1) - (1)].str), lineCount); }
     break;
 
   case 35:
 /* Line 1792 of yacc.c  */
-#line 304 "parser.y"
+#line 246 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 36:
 /* Line 1792 of yacc.c  */
-#line 308 "parser.y"
+#line 250 "parser.y"
     { (yyval.node) = ast_create_binop(OP_ADD, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 37:
 /* Line 1792 of yacc.c  */
-#line 309 "parser.y"
+#line 251 "parser.y"
     { (yyval.node) = ast_create_binop(OP_SUB, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 38:
 /* Line 1792 of yacc.c  */
-#line 310 "parser.y"
+#line 252 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 39:
 /* Line 1792 of yacc.c  */
-#line 314 "parser.y"
+#line 256 "parser.y"
     { (yyval.node) = ast_create_binop(OP_MUL, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 40:
 /* Line 1792 of yacc.c  */
-#line 315 "parser.y"
+#line 257 "parser.y"
     { (yyval.node) = ast_create_binop(OP_DIV, (yyvsp[(1) - (3)].node), (yyvsp[(3) - (3)].node), lineCount); }
     break;
 
   case 41:
 /* Line 1792 of yacc.c  */
-#line 316 "parser.y"
+#line 258 "parser.y"
     { (yyval.node) = (yyvsp[(1) - (1)].node); }
     break;
 
   case 42:
 /* Line 1792 of yacc.c  */
-#line 320 "parser.y"
+#line 262 "parser.y"
     { (yyval.node) = ast_create_num_lit((yyvsp[(1) - (1)].num), lineCount); }
     break;
 
   case 43:
 /* Line 1792 of yacc.c  */
-#line 321 "parser.y"
+#line 263 "parser.y"
     { (yyval.node) = ast_create_chr_lit((yyvsp[(1) - (1)].ch), lineCount); }
     break;
 
   case 44:
 /* Line 1792 of yacc.c  */
-#line 322 "parser.y"
+#line 264 "parser.y"
     { 
-            Symbol *s = lookup((yyvsp[(1) - (1)].str));
-            if (!s) {
-                error_count++;
-                fprintf(stderr, "\nError at line %d: Undefined variable '%s'\n", lineCount, (yyvsp[(1) - (1)].str));
-                (yyval.node) = NULL;
-            } else {
                 (yyval.node) = ast_create_ident((yyvsp[(1) - (1)].str), lineCount);
-            }
         }
     break;
 
   case 45:
 /* Line 1792 of yacc.c  */
-#line 332 "parser.y"
+#line 267 "parser.y"
     { (yyval.node) = (yyvsp[(2) - (3)].node); }
     break;
 
   case 46:
 /* Line 1792 of yacc.c  */
-#line 333 "parser.y"
+#line 268 "parser.y"
     {
             if (!(yyvsp[(2) - (2)].node)) {
                 (yyval.node) = NULL;
@@ -1891,7 +1829,7 @@ yyreduce:
 
   case 47:
 /* Line 1792 of yacc.c  */
-#line 341 "parser.y"
+#line 276 "parser.y"
     {
             (yyval.node) = (yyvsp[(2) - (2)].node);
         }
@@ -1899,7 +1837,7 @@ yyreduce:
 
 
 /* Line 1792 of yacc.c  */
-#line 1903 "parser.tab.c"
+#line 1841 "parser.tab.c"
       default: break;
     }
   /* User semantic actions sometimes alter yychar, and that requires
@@ -2131,7 +2069,7 @@ yyreturn:
 
 
 /* Line 2055 of yacc.c  */
-#line 346 "parser.y"
+#line 280 "parser.y"
 
 
 void yyerror(const char *s) {
@@ -2204,6 +2142,17 @@ int main(int argc, char **argv) {
     
     if (DEBUG_MODE) ast_print(root, 0);
 
+    // BUILD SYMBOL TABLE FIRST - before semantic analysis
+    if (DEBUG_MODE) printf("\n=== Building Symbol Table ===\n");
+    ast_build_symbol_table(root, &error_count);
+    if (error_count > 0) {
+        if (DEBUG_MODE) printf("Symbol table construction failed with %d error(s).\n", error_count);
+        printf("\",\n");
+        ast_free(root);
+        return 1;
+    }
+
+    // semantic analysis (which checks for undefined variables)
     int sem_result = Semantic_analysis();
     if(sem_result != 0){
         printf("\",\n");

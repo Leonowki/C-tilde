@@ -3,7 +3,7 @@
 
 #include "symbol_table.h"
 
-/* ===== CRITICAL: Forward declaration MUST be here ===== */
+
 typedef struct ASTNode ASTNode;
 
 typedef enum {
@@ -93,6 +93,7 @@ struct ASTNode {
         struct {
             char *name;
             ASTNode *initExpr;
+            VarType varType;  
         } nameItem;
     } data;
 };
@@ -119,7 +120,10 @@ ASTNode *ast_create_stmt_list(ASTNode *left, ASTNode *right, int line);
 ASTNode *ast_create_type_decl_list(VarType type, ASTNode *nameList, int line);
 ASTNode *ast_create_name_list(ASTNode *left, ASTNode *right, int line);
 ASTNode *ast_create_name_item(const char *name, ASTNode *init, int line);
+ASTNode *ast_create_name_item_typed(const char *name, ASTNode *init, VarType type, int line);
 
+
+void ast_build_symbol_table(ASTNode *node, int *error_count);    
 void ast_print(ASTNode *node, int indent);
 int ast_check_semantics(ASTNode *node, int *error_count);
 void ast_free(ASTNode *node);

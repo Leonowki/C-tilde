@@ -130,11 +130,16 @@ ASTNode *ast_create_name_list(ASTNode *left, ASTNode *right, int line) {
     return node;
 }
 
-ASTNode *ast_create_name_item(const char *name, ASTNode *init, int line) {
+ASTNode *ast_create_name_item_typed(const char *name, ASTNode *init, VarType type, int line) {
     ASTNode *node = ast_alloc(NODE_NAME_ITEM, line);
     node->data.nameItem.name = strdup(name);
     node->data.nameItem.initExpr = init;
+    node->data.nameItem.varType = type;
     return node;
+}
+
+ASTNode *ast_create_name_item(const char *name, ASTNode *init, int line) {
+    return ast_create_name_item_typed(name, init, TYPE_NMBR, line);
 }
 
 static const char *op_to_string(OpType op) {
@@ -154,6 +159,41 @@ static const char *op_to_string(OpType op) {
 
 static void print_indent(int indent) {
     for (int i = 0; i < indent; i++) printf("  ");
+}
+
+void ast_build_symbol_table(ASTNode *node, int *error_count) {
+    if (!node) return;
+    
+    switch (node->type) {
+        case NODE_PROGRAM:
+            for (int i = 0; i < node->data.stmtList.count; i++) {
+                ast_build_symbol_table(node->data.stmtList.stmts[i], error_count);
+            }
+            break;
+            
+        case NODE_DECL: {
+            Symbol *s = insert(node->data.decl.varName, node->data.decl.varType, node->line, error_count);
+            break;
+        }
+        
+        case NODE_DECL_LIST:
+            ast_build_symbol_table(node->data.declList.left, error_count);
+            ast_build_symbol_table(node->data.declList.right, error_count);
+            break;
+            
+        case NODE_NAME_LIST:
+            ast_build_symbol_table(node->data.nameList.left, error_count);
+            ast_build_symbol_table(node->data.nameList.right, error_count);
+            break;
+            
+        case NODE_NAME_ITEM: {
+            Symbol *s = insert(node->data.nameItem.name, node->data.nameItem.varType, node->line, error_count);
+            break;
+        }
+            
+        default:
+            break;
+    }
 }
 
 void ast_print(ASTNode *node, int indent) {
@@ -225,7 +265,9 @@ void ast_print(ASTNode *node, int indent) {
             ast_print(node->data.nameList.right, indent + 1);
             break;
         case NODE_NAME_ITEM:
-            printf("NameItem(%s)\n", node->data.nameItem.name);
+            printf("NameItem(%s : %s)\n", 
+                node->data.nameItem.name,
+                type_to_string(node->data.nameItem.varType));
             if (node->data.nameItem.initExpr) {
                 ast_print(node->data.nameItem.initExpr, indent + 1);
             }
