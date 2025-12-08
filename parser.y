@@ -73,11 +73,11 @@ VarType current_decl_type;
 %%
 
 program:
-        line_list { 
+        line_list { //Handles programs that are just lines (which can contain statements via line → statement TOK_NEWLINE
             root = $1; 
             $$ = $1;
         }
-    | line_list statement {
+    | line_list statement {//handles statement without newline at EOF
             root = ast_add_stmt($1, $2);
             $$ = root;
         }
