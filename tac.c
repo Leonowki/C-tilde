@@ -691,6 +691,115 @@ static void optimize_simple_assignments(TACProgram *prog) {
         curr = curr->next;
     }
 }
+
+static void optimize_constant_folding(TACProgram *prog) {
+    TACInstr *curr = prog->head;
+    
+    while (curr) {
+        // Pattern: arithmetic operation with two constant operands
+        if ((curr->op == TAC_ADD || curr->op == TAC_SUB || 
+             curr->op == TAC_MUL || curr->op == TAC_DIV) &&
+            curr->arg1.type == OPERAND_TEMP &&
+            curr->arg2.type == OPERAND_TEMP) {
+            
+            // Check if both temps come from LOAD_INT instructions
+            TACInstr *load1 = NULL, *load2 = NULL;
+            
+            for (TACInstr *check = prog->head; check != curr; check = check->next) {
+                if (check->op == TAC_LOAD_INT && check->result.type == OPERAND_TEMP) {
+                    if (check->result.val.tempNum == curr->arg1.val.tempNum) {
+                        load1 = check;
+                    }
+                    if (check->result.val.tempNum == curr->arg2.val.tempNum) {
+                        load2 = check;
+                    }
+                }
+            }
+            
+            // If both are constant loads, fold them
+            if (load1 && load2 && 
+                load1->arg1.type == OPERAND_INT && 
+                load2->arg1.type == OPERAND_INT) {
+                
+                int val1 = load1->arg1.val.intVal;
+                int val2 = load2->arg1.val.intVal;
+                int result = 0;
+                
+                switch (curr->op) {
+                    case TAC_ADD: result = val1 + val2; break;
+                    case TAC_SUB: result = val1 - val2; break;
+                    case TAC_MUL: result = val1 * val2; break;
+                    case TAC_DIV: 
+                        if (val2 != 0) result = val1 / val2;
+                        else goto skip_fold;
+                        break;
+                    default: goto skip_fold;
+                }
+                
+                // Replace arithmetic op with direct load
+                curr->op = TAC_LOAD_INT;
+                curr->arg1 = tac_operand_int(result);
+                curr->arg2 = tac_operand_none();
+                
+            
+            }
+        }
+        skip_fold:
+        curr = curr->next;
+    }
+}
+
+static void eliminate_dead_code(TACProgram *prog) {
+    TACInstr *curr = prog->head;
+    TACInstr *prev = NULL;
+    
+    while (curr) {
+        int isDead = 0;
+        
+        // Check if this is a LOAD_INT into a temp that's never used
+        if (curr->op == TAC_LOAD_INT && curr->result.type == OPERAND_TEMP) {
+            int tempNum = curr->result.val.tempNum;
+            int isUsed = 0;
+            
+            // Check if this temp is used anywhere after this instruction
+            TACInstr *check = curr->next;
+            while (check) {
+                if ((check->arg1.type == OPERAND_TEMP && check->arg1.val.tempNum == tempNum) ||
+                    (check->arg2.type == OPERAND_TEMP && check->arg2.val.tempNum == tempNum)) {
+                    isUsed = 1;
+                    break;
+                }
+                check = check->next;
+            }
+            
+            if (!isUsed) {
+                isDead = 1;
+            }
+        }
+        
+        // Remove dead instruction
+        if (isDead) {
+            if (prev) {
+                prev->next = curr->next;
+            } else {
+                prog->head = curr->next;
+            }
+            
+            if (curr == prog->tail) {
+                prog->tail = prev;
+            }
+            
+            TACInstr *toFree = curr;
+            curr = curr->next;
+            free(toFree);
+            continue;
+        }
+        
+        prev = curr;
+        curr = curr->next;
+    }
+}
+
 //Optimizer 2
 static void optimize_arithmetic_assignments(TACProgram *prog) {
     TACInstr *curr = prog->head;
@@ -743,6 +852,8 @@ TACProgram *tac_generate(ASTNode *ast) {
     TACProgram *prog = tac_create_program();
     tac_gen_stmt(prog, ast);
 
+    optimize_constant_folding(prog);
+    eliminate_dead_code(prog);     
     optimize_simple_assignments(prog);
     optimize_arithmetic_assignments(prog); 
 
@@ -1208,10 +1319,14 @@ void tac_generate_assembly(TACProgram *prog) {
                     // Load directly to variable in memory
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
-                        snprintf(asm_line, sizeof(asm_line), "daddiu r2, r0, %d\n", instr->arg1.val.intVal);
+                        // **FIX: Handle negative immediates properly**
+                        int immediate = instr->arg1.val.intVal;
+                        
+                        snprintf(asm_line, sizeof(asm_line), "daddiu r2, r0, %d\n", immediate);
                         strcat(assembly_output, asm_line);
                         
-                        uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, 2, (int16_t)instr->arg1.val.intVal);
+                        // Cast to int16_t to properly handle negative values in encoding
+                        uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, 2, (int16_t)immediate);
                         char hex_str[32];
                         sprintf(hex_str, "0x%08X\n", mc);
                         strcat(hex_output, hex_str);
@@ -1239,15 +1354,19 @@ void tac_generate_assembly(TACProgram *prog) {
                 } else if (instr->result.type == OPERAND_TEMP) {
                     // Load immediate into register
                     int regIdx = allocate_register_for_temp(instr, instr->result.val.tempNum, 
-                                                           assembly_output, hex_output, binary_output, 
-                                                           tempStorageOffset);
+                                                        assembly_output, hex_output, binary_output, 
+                                                        tempStorageOffset);
                     const char *regName = get_reg_name(regIdx);
                     
-                    snprintf(asm_line, sizeof(asm_line), "daddiu %s, r0, %d\n", regName, instr->arg1.val.intVal);
+                    // **FIX: Handle negative immediates properly**
+                    int immediate = instr->arg1.val.intVal;
+                    
+                    snprintf(asm_line, sizeof(asm_line), "daddiu %s, r0, %d\n", regName, immediate);
                     strcat(assembly_output, asm_line);
                     
                     int rt = get_register_number(regName);
-                    uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)instr->arg1.val.intVal);
+                    // Cast to int16_t to properly handle negative values in encoding
+                    uint32_t mc = encode_i_format(OPCODE_DADDIU, 0, rt, (int16_t)immediate);
                     
                     char hex_str[32];
                     sprintf(hex_str, "0x%08X\n", mc);
