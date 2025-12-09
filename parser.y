@@ -73,7 +73,7 @@ VarType current_decl_type;
 %%
 
 program:
-        line_list { //Handles programs that are just lines (which can contain statements via line → statement TOK_NEWLINE
+        line_list { //Handles programs that are just lines (which can contain statements via line ->statement TOK_NEWLINE
             root = $1; 
             $$ = $1;
         }
