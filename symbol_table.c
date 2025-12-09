@@ -41,7 +41,7 @@ Symbol *insert(const char *name, VarType type, int line, int *error) {
     else
         newSym->flexType = FLEX_NONE;
 
-    // Initialize memory info (will be computed later)
+    // Initialize memory info (will be computed later default to -1 muna)
     newSym->memOffset = -1;
     newSym->size = get_size_for_type(type);
 
@@ -111,7 +111,7 @@ void compute_symbol_offsets(void) {
     
     // Compute offsets with proper alignment
     for (int i = 0; i < symcount; i++) {
-        // Uncomment the next 3 lines if you want alignment
+        // 
         // if (symtab[i].type == TYPE_NMBR || symtab[i].type == TYPE_FLEX) {
         //     currentOffset = (currentOffset + 3) & ~3; // Align to 4-byte boundary
         // }

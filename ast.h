@@ -37,7 +37,7 @@ typedef enum {
     OP_DIV_ASSIGN,
 } OpType;
 
-/* NOW define the actual struct */
+/*define the actual struct */
 struct ASTNode {
     NodeType type;
     int line;

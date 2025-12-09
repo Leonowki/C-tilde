@@ -873,7 +873,7 @@ static void optimize_constant_folding(TACProgram *prog) {
             if (load1 && load2 && 
                 load1->arg1.type == OPERAND_INT && 
                 load2->arg1.type == OPERAND_INT &&
-                load1->arg1.val.intVal == 0) {  // ← KEY: first operand must be 0
+                load1->arg1.val.intVal == 0) {  // first operand must be 0
                 
                 int val2 = load2->arg1.val.intVal;
                 int result = 0 - val2;
@@ -1132,7 +1132,7 @@ static int get_operand_value(TACOperand op, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
-                /* FIX: For chr type, return ASCII value as integer for arithmetic */
+                /*For chr type, return ASCII value as integer for arithmetic */
                 if (s->type == TYPE_CHR) {
                     return (int)s->chrVal;
                 }
@@ -1165,7 +1165,7 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
         case OPERAND_VAR: {
             Symbol *s = lookup(op.val.varName);
             if (s) {
-                // **FIX: Check if the value being set has char type info**
+                // Check if the value being set has char type info
                 if (op.isCharType) {
                     // This is a character value, use set_char
                     set_char(s, (char)value);
@@ -1174,7 +1174,7 @@ static void set_operand_value(TACOperand op, int value, int *tempValues) {
                 else if (s->type == TYPE_FLEX) {
                     // If assigning a char to flex, preserve char type
                     if (op.isCharType || (value >= 0 && value <= 127)) {
-                        // For now, default to number unless explicitly marked as char
+                        // default to number unless explicitly marked as char
                         set_number(s, value);
                     } else {
                         set_number(s, value);
@@ -1211,7 +1211,7 @@ int tac_execute(TACProgram *prog) {
             case TAC_LOAD_INT: {
                 int value = get_operand_value(instr->arg1, tempValues);
                 
-                // FIX: Handle type conversion on load
+                //Handle type conversion on load
                 if (instr->result.type == OPERAND_VAR) {
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
@@ -1383,13 +1383,14 @@ static int get_register_number(const char *reg) {
             return num;  // Direct mapping: r2=2, r3=3, ..., r11=11
         }
     }
-    
+    //old deprecated mappings
     if (reg[0] == '$' && reg[1] == 't') {
         int num = atoi(reg + 2);
         if (num >= 0 && num <= 7) return 8 + num;   // $t0-$t7
         if (num >= 8 && num <= 9) return 24 + (num - 8); // $t8-$t9
     }
-    
+
+    //old deprecated mappings
     // $s0-$s7 (saved)
     if (reg[0] == '$' && reg[1] == 's') {
         int num = atoi(reg + 2);
@@ -1583,8 +1584,7 @@ void tac_generate_assembly(TACProgram *prog) {
                 // Allocate destination register
                 int destReg;
                 if (instr->result.type == OPERAND_TEMP) {
-                    // OPTIMIZATION: Try to reuse one of the source registers if possible
-                    // This is safe if the source temp is dead after this instruction
+                    
                     
                     // Check if left operand is a temp that dies here
                     if (instr->arg1.type == OPERAND_TEMP && 
@@ -1683,7 +1683,7 @@ void tac_generate_assembly(TACProgram *prog) {
                 // Mark result as dirty
                 regState[destReg].isDirty = 1;
                 
-                // ALWAYS store result if it's a variable - WITH TYPE-AWARE OPERATIONS
+                // ALWAYS store result if it's a variable 
                 if (instr->result.type == OPERAND_VAR) {
                     Symbol *s = lookup(instr->result.val.varName);
                     if (s) {
@@ -1766,7 +1766,7 @@ void tac_generate_assembly(TACProgram *prog) {
                             strcat(binary_output, "\n");
                         }
                     }
-                    break;  // Important: break here to avoid falling through
+                    break; 
                 }
                 
                 // Original code for copying from temp/variable

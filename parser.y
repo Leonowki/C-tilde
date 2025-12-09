@@ -23,7 +23,7 @@ bool DEBUG_MODE = false;
 VarType current_decl_type;
 
 %}
-
+//possible types 
 %union {
     int num;
     char ch;
@@ -57,13 +57,13 @@ VarType current_decl_type;
 %token TOK_NEWLINE
 %token TOK_COMMA
 
-/* Literals */
+/* Literal token from the lexer */
 %token <num> TOK_NUMBER_LITERAL
 %token <ch>  TOK_CHAR_LITERAL
 %token <str> TOK_STRING_LITERAL
 %token <str> TOK_IDENTIFIER
 
-/* Non-terminal types */
+/* Non-terminal types for AST nodes */
 %type <node> program line_list line statement 
 %type <node> declaration single_decl
 %type <node> decl_continuation
